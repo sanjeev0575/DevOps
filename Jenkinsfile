@@ -16,14 +16,6 @@ pipeline {
         git branch: 'main', credentialsId: 'git credentials', url: 'https://github.com/sanjeev0575/DevOps.git'
       }
     }
+    }
+}
 
-  post {
-    success {
-      echo "✅ Deployment to ECS successful!"
-    }
-    failure {
-      echo "❌ Deployment failed."
-    }
-  }
-}
-}
