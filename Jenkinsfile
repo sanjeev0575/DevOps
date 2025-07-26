@@ -20,8 +20,8 @@ pipeline {
     stage('Build Docker Image') {
       steps {
         script {
-            sh "sudo groupadd docker"
-            sh "sudo usermod -aG docker $USER"
+            // sh "sudo groupadd docker"
+            // sh "sudo usermod -aG docker $USER"
             dockerImage = docker.build("${ECR_REPO}:${IMAGE_TAG}")
         }
       }
