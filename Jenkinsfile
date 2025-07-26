@@ -2,8 +2,8 @@ pipeline {
   agent any
 
    environment {
-//     AWS_REGION     = 'us-east-1'
-//     AWS_ACCOUNT_ID = '<your-aws-account-id>'
+     AWS_REGION     = 'us-east-1'
+     AWS_ACCOUNT_ID = '115456585578'
      ECR_REPO       = 'my-ecr-repo'
      IMAGE_TAG      = "${env.BUILD_NUMBER}"
 //     CLUSTER        = 'my-ecs-cluster'
@@ -20,10 +20,15 @@ pipeline {
     stage('Build Docker Image') {
       steps {
         script {
-            // sh "sudo groupadd docker"
-            // sh "sudo usermod -aG docker $USER"
             dockerImage = docker.build("${ECR_REPO}:${IMAGE_TAG}")
         }
+      }
+    }
+    stage('Login to ECR') {
+      steps {
+        sh '''
+        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+        '''
       }
     }
     }
