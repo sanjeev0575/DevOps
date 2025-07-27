@@ -20,7 +20,8 @@ pipeline {
     stage('Build Docker Image') {
       steps {
         script {
-            dockerImage = docker.build("${ECR_REPO}:${IMAGE_TAG}")
+            dockerImage = docker.build("${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${IMAGE_TAG}") 
+            // docker.build("${ECR_REPO}:${IMAGE_TAG}")
         }
       }
     }
@@ -39,6 +40,7 @@ pipeline {
   }
   stage('Pushing to ECR') {
     steps {
+      // sh "docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${IMAGE_TAG}"
       sh "docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${IMAGE_TAG}"
     }
   }
