@@ -6,8 +6,8 @@ pipeline {
      AWS_ACCOUNT_ID = '115456585578'
      ECR_REPO       = 'devops'
      IMAGE_TAG      = "${env.BUILD_NUMBER}"
-    CLUSTER        = 'my-ecs-cluster-devops'
-    SERVICE        = 'my-ecs-service-devops'
+    CLUSTER        = 'my-ecs-cluster'
+    SERVICE        = 'my-ecs-service'
    }
 
   stages {
