@@ -4,7 +4,7 @@ pipeline {
    environment {
      AWS_REGION     = 'us-east-1'
      AWS_ACCOUNT_ID = '115456585578'
-     ECR_REPO       = 'my-ecr-repo'
+     ECR_REPO       = 'devops'
      IMAGE_TAG      = "${env.BUILD_NUMBER}"
 //     CLUSTER        = 'my-ecs-cluster'
 //     SERVICE        = 'my-ecs-service'
@@ -39,7 +39,7 @@ pipeline {
   }
   stage('Pushing to ECR') {
     steps {
-      sh "docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${env.JOB_NAME}:${IMAGE_TAG}"
+      sh "docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${IMAGE_TAG}"
     }
   }
 
