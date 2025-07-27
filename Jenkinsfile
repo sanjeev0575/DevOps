@@ -24,16 +24,6 @@ pipeline {
         }
       }
     }
-    // stage('Login to ECR') {
-    //   steps {
-    //     sh '''
-    //     withCredentials([aws(accessKeyVariable: 'AWS_ACCESS_KEY_ID', credentialsId: 'aws-cred', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-
-    //     aws sts get-caller-identity
-    //     aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
-    //     '''
-    //   }
-    // }
   stage('Login to ECR') {
    steps {
     withCredentials([aws(accessKeyVariable: 'AWS_ACCESS_KEY_ID', credentialsId: 'aws-cred', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
@@ -46,6 +36,11 @@ pipeline {
       '''
     }
   }
+  }
+  stage('Pushing to ECR') {
+    steps {
+      sh "docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${env.JOB_NAME}:${IMAGE_TAG}"
+    }
   }
 
 
