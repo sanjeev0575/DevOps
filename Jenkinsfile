@@ -7,7 +7,7 @@ pipeline {
      ECR_REPO       = 'devops'
      IMAGE_TAG      = "${env.BUILD_NUMBER}"
     CLUSTER        = 'my-ecs-cluster-devops'
-    SERVICE        = 'my-ecs-service-devops
+    SERVICE        = 'my-ecs-service-devops'
    }
 
   stages {
