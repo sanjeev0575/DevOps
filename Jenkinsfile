@@ -6,8 +6,8 @@ pipeline {
      AWS_ACCOUNT_ID = '115456585578'
      ECR_REPO       = 'devops'
      IMAGE_TAG      = "${env.BUILD_NUMBER}"
-//     CLUSTER        = 'my-ecs-cluster'
-//     SERVICE        = 'my-ecs-service'
+    CLUSTER        = 'my-ecs-cluster-devops'
+    SERVICE        = 'my-ecs-service-devops
    }
 
   stages {
@@ -42,6 +42,28 @@ pipeline {
     steps {
       // sh "docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${IMAGE_TAG}"
       sh "docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${IMAGE_TAG}"
+    }
+  }
+
+  stage('Cleanup Docker Images') {
+    steps {
+        script {
+            sh '''
+            echo "Cleaning up Docker images..."
+            docker image prune -af
+            '''
+        }
+    }
+  }
+  stage('Deploy to ECS') {
+    steps {
+      sh '''
+        aws ecs update-service \
+                    --cluster $CLUSTER_NAME \
+                    --service $SERVICE_NAME \
+                    --force-new-deployment \
+                    --region $AWS_REGION
+                '''
     }
   }
 
