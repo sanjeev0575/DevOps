@@ -8,6 +8,7 @@ pipeline {
     IMAGE_TAG      = "${env.BUILD_NUMBER}"
     CLUSTER        = 'my-ecs-cluster'
     SERVICE        = 'my-ecs-service'
+    ALB_NAME       = 'my-app-alb'
   }
 
   stages {
