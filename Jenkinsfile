@@ -8,7 +8,7 @@ pipeline {
     IMAGE_TAG      = "${env.BUILD_NUMBER}"
     CLUSTER        = 'my-ecs-cluster'
     SERVICE        = 'my-ecs-service'
-    ALB_NAME       = 'my-app-alb'
+    TASK_FAMILY    = 'python-app-task'
   }
 
   stages {
@@ -59,52 +59,27 @@ pipeline {
         '''
       }
     }
+    stage('Update Task Definition') {
+      steps {
+        sh """
+        TASK_DEF=$(aws ecs describe-task-definition --task-definition $TASK_FAMILY)
+        NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$IMAGE_TAG" '.taskDefinition | .containerDefinitions[0].image = $IMAGE | {family: .family, containerDefinitions: .containerDefinitions, networkMode: .networkMode, requiresCompatibilities: .requiresCompatibilities, cpu: .cpu, memory: .memory, executionRoleArn: .executionRoleArn}')
+        echo $NEW_TASK_DEF > new-task-def.json
+        aws ecs register-task-definition --cli-input-json file://new-task-def.json
+        """
+      }
+    }
+    stage('Deploy to ECS') {
+      steps {
+        sh """
+        aws ecs update-service \
+          --cluster $CLUSTER \
+          --service $SERVICE \
+          --force-new-deployment
+        """
+      }
 
-    // stage('Deploy to ECS') {
-    //   steps {
-    //     sh '''
-    //       aws ecs update-service \
-    //         --cluster $CLUSTER \
-    //         --service $SERVICE \
-    //         --force-new-deployment \
-    //         --region $AWS_REGION
-    //     '''
-    //   }
-    // }
-    // stage('Wait for Deployment') {
-    //   steps {
-    //     sh '''
-    //     while true; do
-    //       STATUS=$(aws ecs describe-services \
-    //         --cluster $CLUSTER \
-    //         --services $SERVICE \
-    //         --region $AWS_REGION \
-    //         --query "services[0].deployments[0].rolloutState" \
-    //         --output text)
-
-    //       echo "Deployment status: $STATUS"
-
-    //       if [ "$STATUS" = "COMPLETED" ]; then
-    //         echo "Deployment completed!"
-    //         break
-    //       fi
-
-    //       sleep 10
-    //     done
-    //     '''
-    //   }
-    // }
-    // stage('Get App URL') {
-    //   steps {
-    //     script {
-    //       def url = sh(
-    //         script: "aws elbv2 describe-load-balancers --names $ALB_NAME --region $AWS_REGION --query 'LoadBalancers[0].DNSName' --output text",
-    //         returnStdout: true
-    //       ).trim()
-    //       echo "✅ Application is available at: http://${url}"
-    //     }
-    //   }
-    // }
+    
 
   }
 }
