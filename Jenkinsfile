@@ -61,12 +61,14 @@ pipeline {
     }
     stage('Update Task Definition') {
       steps {
-        sh """
+        sh '''
+        
         TASK_DEF=$(aws ecs describe-task-definition --task-definition $TASK_FAMILY)
         NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$IMAGE_TAG" '.taskDefinition | .containerDefinitions[0].image = $IMAGE | {family: .family, containerDefinitions: .containerDefinitions, networkMode: .networkMode, requiresCompatibilities: .requiresCompatibilities, cpu: .cpu, memory: .memory, executionRoleArn: .executionRoleArn}')
         echo $NEW_TASK_DEF > new-task-def.json
         aws ecs register-task-definition --cli-input-json file://new-task-def.json
-        """
+
+        '''
       }
     }
     stage('Deploy to ECS') {
