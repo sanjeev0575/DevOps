@@ -71,6 +71,16 @@ pipeline {
         '''
       }
     }
+    stage('Debug Cluster & Service') {
+      steps {
+        sh '''
+          echo "Verifying cluster and service..."
+          aws ecs describe-clusters --clusters $CLUSTER --region $AWS_REGION
+          aws ecs describe-services --cluster $CLUSTER --services $SERVICE --region $AWS_REGION
+        '''
+      } 
+    }
+
     stage('Deploy to ECS') {
       steps {
         sh """
