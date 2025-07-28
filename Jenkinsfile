@@ -60,51 +60,51 @@ pipeline {
       }
     }
 
-    stage('Deploy to ECS') {
-      steps {
-        sh '''
-          aws ecs update-service \
-            --cluster $CLUSTER \
-            --service $SERVICE \
-            --force-new-deployment \
-            --region $AWS_REGION
-        '''
-      }
-    }
-    stage('Wait for Deployment') {
-      steps {
-        sh '''
-        while true; do
-          STATUS=$(aws ecs describe-services \
-            --cluster $CLUSTER \
-            --services $SERVICE \
-            --region $AWS_REGION \
-            --query "services[0].deployments[0].rolloutState" \
-            --output text)
+    // stage('Deploy to ECS') {
+    //   steps {
+    //     sh '''
+    //       aws ecs update-service \
+    //         --cluster $CLUSTER \
+    //         --service $SERVICE \
+    //         --force-new-deployment \
+    //         --region $AWS_REGION
+    //     '''
+    //   }
+    // }
+    // stage('Wait for Deployment') {
+    //   steps {
+    //     sh '''
+    //     while true; do
+    //       STATUS=$(aws ecs describe-services \
+    //         --cluster $CLUSTER \
+    //         --services $SERVICE \
+    //         --region $AWS_REGION \
+    //         --query "services[0].deployments[0].rolloutState" \
+    //         --output text)
 
-          echo "Deployment status: $STATUS"
+    //       echo "Deployment status: $STATUS"
 
-          if [ "$STATUS" = "COMPLETED" ]; then
-            echo "Deployment completed!"
-            break
-          fi
+    //       if [ "$STATUS" = "COMPLETED" ]; then
+    //         echo "Deployment completed!"
+    //         break
+    //       fi
 
-          sleep 10
-        done
-        '''
-      }
-    }
-    stage('Get App URL') {
-      steps {
-        script {
-          def url = sh(
-            script: "aws elbv2 describe-load-balancers --names $ALB_NAME --region $AWS_REGION --query 'LoadBalancers[0].DNSName' --output text",
-            returnStdout: true
-          ).trim()
-          echo "✅ Application is available at: http://${url}"
-        }
-      }
-    }
+    //       sleep 10
+    //     done
+    //     '''
+    //   }
+    // }
+    // stage('Get App URL') {
+    //   steps {
+    //     script {
+    //       def url = sh(
+    //         script: "aws elbv2 describe-load-balancers --names $ALB_NAME --region $AWS_REGION --query 'LoadBalancers[0].DNSName' --output text",
+    //         returnStdout: true
+    //       ).trim()
+    //       echo "✅ Application is available at: http://${url}"
+    //     }
+    //   }
+    // }
 
   }
 }
