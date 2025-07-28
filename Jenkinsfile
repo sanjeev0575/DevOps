@@ -51,48 +51,48 @@ pipeline {
       }
     }
 
-    stage('Cleanup Docker Images') {
-      steps {
-        sh '''
-          echo "Cleaning up Docker images..."
-          docker image prune -af
-        '''
-      }
-    }
-    stage('Update Task Definition') {
-      steps {
-        sh '''
+  //   stage('Cleanup Docker Images') {
+  //     steps {
+  //       sh '''
+  //         echo "Cleaning up Docker images..."
+  //         docker image prune -af
+  //       '''
+  //     }
+  //   }
+  //   stage('Update Task Definition') {
+  //     steps {
+  //       sh '''
         
-        TASK_DEF=$(aws ecs describe-task-definition --task-definition $TASK_FAMILY)
-        NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$IMAGE_TAG" '.taskDefinition | .containerDefinitions[0].image = $IMAGE | {family: .family, containerDefinitions: .containerDefinitions, networkMode: .networkMode, requiresCompatibilities: .requiresCompatibilities, cpu: .cpu, memory: .memory, executionRoleArn: .executionRoleArn}')
-        echo $NEW_TASK_DEF > new-task-def.json
-        aws ecs register-task-definition --cli-input-json file://new-task-def.json
+  //       TASK_DEF=$(aws ecs describe-task-definition --task-definition $TASK_FAMILY)
+  //       NEW_TASK_DEF=$(echo $TASK_DEF | jq --arg IMAGE "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$IMAGE_TAG" '.taskDefinition | .containerDefinitions[0].image = $IMAGE | {family: .family, containerDefinitions: .containerDefinitions, networkMode: .networkMode, requiresCompatibilities: .requiresCompatibilities, cpu: .cpu, memory: .memory, executionRoleArn: .executionRoleArn}')
+  //       echo $NEW_TASK_DEF > new-task-def.json
+  //       aws ecs register-task-definition --cli-input-json file://new-task-def.json
 
-        '''
-      }
-    }
-    stage('Debug Cluster & Service') {
-      steps {
-        sh '''
-          echo "Verifying cluster and service..."
-          aws ecs describe-clusters --clusters $CLUSTER --region $AWS_REGION
-          aws ecs describe-services --cluster $CLUSTER --services $SERVICE --region $AWS_REGION
-        '''
-      } 
-    }
+  //       '''
+  //     }
+  //   }
+  //   stage('Debug Cluster & Service') {
+  //     steps {
+  //       sh '''
+  //         echo "Verifying cluster and service..."
+  //         aws ecs describe-clusters --clusters $CLUSTER --region $AWS_REGION
+  //         aws ecs describe-services --cluster $CLUSTER --services $SERVICE --region $AWS_REGION
+  //       '''
+  //     } 
+  //   }
 
-    stage('Deploy to ECS') {
-      steps {
-        sh """
-        aws ecs update-service \
-          --cluster $CLUSTER \
-          --service $SERVICE \
-          --force-new-deployment
-        """
-      }
+  //   stage('Deploy to ECS') {
+  //     steps {
+  //       sh """
+  //       aws ecs update-service \
+  //         --cluster $CLUSTER \
+  //         --service $SERVICE \
+  //         --force-new-deployment
+  //       """
+  //     }
 
     
 
-  }
+  // }
 }
 }
