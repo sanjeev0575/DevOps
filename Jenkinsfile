@@ -249,7 +249,7 @@ pipeline {
     SERVICE          = 'my-ecs-service'
     TASK_FAMILY      = 'python-app-task'
     TASK_ROLE_ARN    = 'arn:aws:iam::115456585578:role/ecsTaskExecutionRole'
-    SUBNETS          = 'subnet-0cefa984039dbc9df'
+    SUBNETS          = 'subnet-0cefa984039dbc9df' 'subnet-00d20a28ebb69e58e'
     SECURITY_GROUPS  = 'sg-017eeb5250435bd47'
     //TARGET_GROUP_ARN = 'aarn:aws:elasticloadbalancing:us-east-1:115456585578:targetgroup/my-python-app-tg/c5a4165738f30115' // Update with correct ARN
     TARGET_GROUP_ARN = 'arn:aws:elasticloadbalancing:us-east-1:115456585578:targetgroup/my-python-app-tg/c5a4165738f30115'
