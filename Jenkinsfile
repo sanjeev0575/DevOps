@@ -297,7 +297,7 @@ pipeline {
           credentialsId: 'aws-cred',
           accessKeyVariable: 'AWS_ACCESS_KEY_ID',
           secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-        )]) 
+        )])  {
         sh '''
           cat > task-definition.json <<EOF
           {
@@ -336,14 +336,14 @@ pipeline {
         '''
       }
     }
-
+    }
     stage('Check or Create ECS Service') {
       steps {
         withCredentials([aws(
           credentialsId: 'aws-cred',
           accessKeyVariable: 'AWS_ACCESS_KEY_ID',
           secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-        )]) 
+        )]) {
         sh '''
           SERVICE_STATUS=$(aws ecs describe-services --cluster $CLUSTER --services $SERVICE --region $AWS_REGION --query 'services[0].status' --output text || echo "NONE")
           if [ "$SERVICE_STATUS" != "ACTIVE" ]; then
@@ -369,7 +369,7 @@ pipeline {
         '''
       }
     }
-
+    }
     stage('Verify Deployment') {
       steps {
         sh '''
