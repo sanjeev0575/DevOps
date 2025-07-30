@@ -370,20 +370,20 @@ pipeline {
       }
     }
     }
-    // stage('Verify Deployment') {
-    //   steps {
-    //     withCredentials([aws(
-    //       credentialsId: 'aws-cred',
-    //       accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-    //       secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-    //     )]){
-    //     sh '''
-    //       aws ecs wait services-stable --cluster $CLUSTER --services $SERVICE --region $AWS_REGION
-    //       aws ecs describe-services --cluster $CLUSTER --services $SERVICE --region $AWS_REGION
-    //     '''
-    //   }
-    // }
-    // }
+    stage('Verify Deployment') {
+      steps {
+        withCredentials([aws(
+          credentialsId: 'aws-cred',
+          accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+          secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+        )]){
+        sh '''
+          aws ecs wait services-stable --cluster $CLUSTER --services $SERVICE --region $AWS_REGION
+          aws ecs describe-services --cluster $CLUSTER --services $SERVICE --region $AWS_REGION
+        '''
+      }
+    }
+    }
     stage('Cleanup Docker Images') {
       steps {
         sh '''
