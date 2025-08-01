@@ -245,7 +245,7 @@ pipeline {
     AWS_ACCOUNT_ID   = '115456585578'
     ECR_REPOSITORY   = 'devops'
     IMAGE_TAG        = "${env.BUILD_NUMBER}"
-    CLUSTER          = 'my-ecs-cluster-automated-deploy'
+    ECS_CLUSTER          = 'my-ecs-cluster-automated-deploy'
     SERVICE          = 'my-ecs-service-automated-deploy'
     TASK_FAMILY      = 'python-app-task-automated'
     TASK_DEFINITION_NAME = 'automated-deploy-task'
