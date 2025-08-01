@@ -1,20 +1,51 @@
+// {
+//   "family": "python-app-task",
+//   "networkMode": "awsvpc",
+//   "cpu": "256",
+//   "memory": "512",
+//   "requiresCompatibilities": ["FARGATE"],
+//   "executionRoleArn": "arn:aws:iam::115456585578:role/ecsTaskExecutionRole",
+//   "containerDefinitions": [
+//     {
+//       "name": "python-app",
+//       "image": "115456585578.dkr.ecr.us-east-1.amazonaws.com/devops:39",
+//       "portMappings": [
+//         {
+//           "containerPort": 5000,
+//           "protocol": "tcp"
+//         }
+//       ]
+//     }
+//   ]
+// }
+
 {
-  "family": "python-app-task",
+  "family": "automated-deploy-task",
+  "executionRoleArn": "arn:aws:iam::115456585578:role/ecsTaskExecutionRole",
   "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
   "cpu": "256",
   "memory": "512",
-  "requiresCompatibilities": ["FARGATE"],
-  "executionRoleArn": "arn:aws:iam::115456585578:role/ecsTaskExecutionRole",
   "containerDefinitions": [
     {
-      "name": "python-app",
-      "image": "115456585578.dkr.ecr.us-east-1.amazonaws.com/devops:39",
+      "name": "my-app-container",
+      "image": "115456585578.dkr.ecr.REGION.amazonaws.com/automated-deploy-task:latest",
+      "essential": true,
       "portMappings": [
         {
           "containerPort": 5000,
+          "hostPort": 5000,
           "protocol": "tcp"
         }
-      ]
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/automated-deploy-task",
+          "awslogs-region": "REGION",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
     }
   ]
 }
