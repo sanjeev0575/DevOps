@@ -296,33 +296,68 @@ pipeline {
     //     }
     //   }
     // }
+  // stage('Update Task Definition') {
+  //   steps {
+  //     script {
+  //       sh """
+  //         export TASK_FAMILY=${TASK_FAMILY}
+  //         export CONTAINER_NAME=${CONTAINER_NAME}
+  //         export IMAGE_TAG=${IMAGE_TAG}
+  //         export AWS_REGION=${AWS_REGION}
+  //         export AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID}
+  //         export ECR_REPOSITORY=${ECR_REPOSITORY}
+  //         export ECR_REGISTRY=${ECR_REGISTRY}
+
+  //         envsubst < task-definition-template.json > task-definition.json
+
+  //         echo '==== Rendered task-definition.json ===='
+  //         cat task-definition.json
+
+  //         echo '==== Validating JSON ===='
+  //         jq . task-definition.json
+
+  //         echo '==== Registering task ===='
+  //         aws ecs register-task-definition --cli-input-json file://task-definition-rendered.json
+
+  //       """
+  //       }
+  //     }
+  //   }
   stage('Update Task Definition') {
     steps {
-      script {
-        sh """
-          export TASK_FAMILY=${TASK_FAMILY}
-          export CONTAINER_NAME=${CONTAINER_NAME}
-          export IMAGE_TAG=${IMAGE_TAG}
-          export AWS_REGION=${AWS_REGION}
-          export AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID}
-          export ECR_REPOSITORY=${ECR_REPOSITORY}
-          export ECR_REGISTRY=${ECR_REGISTRY}
+      withCredentials([aws(
+        credentialsId: 'aws-cred',
+        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+        )]) {
+        sh '''
+          #— export all vars so envsubst can see them
+          export AWS_ACCOUNT_ID='115456585578'
+          export AWS_REGION='us-east-1'
+          export ECR_REPOSITORY='devops'
+          export ECR_REGISTRY='115456585578.dkr.ecr.us-east-1.amazonaws.com'
+          export IMAGE_TAG='${BUILD_NUMBER}'
+          export CONTAINER_NAME='my-app-container'
+          export TASK_DEFINITION_NAME='automated-deploy-task'
 
-          envsubst < task-definition-template.json > task-definition.json
+          #— render template into valid JSON
+          envsubst < task-definition-template.json > task-definition-rendered.json
 
-          echo '==== Rendered task-definition.json ===='
-          cat task-definition.json
+          #— debug / validate
+          echo '---- rendered task-definition ----'
+          cat task-definition-rendered.json
+          echo '---- validating JSON via jq ----'
+          jq . task-definition-rendered.json
 
-          echo '==== Validating JSON ===='
-          jq . task-definition.json
-
-          echo '==== Registering task ===='
-          aws ecs register-task-definition --cli-input-json file://task-definition-rendered.json
-
-        """
+          #— register with ECS
+          aws ecs register-task-definition \
+            --cli-input-json file://task-definition-rendered.json \
+            --region $AWS_REGION
+          '''
         }
       }
     }
+
 
 
   }
