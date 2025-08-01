@@ -300,13 +300,29 @@ pipeline {
     steps {
       script {
         sh """
-          sed -i 's|\\(\"image\": *\\\"${ECR_REGISTRY}/${ECR_REPOSITORY}:\\)[^\\"]*|\\1${IMAGE_TAG}|' task-definition.json
-          cat task-definition.json  # Optional: view result
+          export TASK_FAMILY=${TASK_FAMILY}
+          export CONTAINER_NAME=${CONTAINER_NAME}
+          export IMAGE_TAG=${IMAGE_TAG}
+          export AWS_REGION=${AWS_REGION}
+          export AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID}
+          export ECR_REPOSITORY=${ECR_REPOSITORY}
+          export ECR_REGISTRY=${ECR_REGISTRY}
+
+          envsubst < task-definition-template.json > task-definition.json
+
+          echo '==== Rendered task-definition.json ===='
+          cat task-definition.json
+
+          echo '==== Validating JSON ===='
+          jq . task-definition.json
+
+          echo '==== Registering task ===='
           aws ecs register-task-definition --cli-input-json file://task-definition.json --region ${AWS_REGION}
         """
+        }
       }
     }
-  }
+
 
   }
 }
