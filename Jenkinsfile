@@ -238,122 +238,125 @@
 // }
 
 pipeline {
-  agent any
+    agent any
 
-  environment {
-    AWS_REGION       = 'us-east-1'
-    AWS_ACCOUNT_ID   = '115456585578'
-    ECR_REPOSITORY   = 'devops'
-    IMAGE_TAG        = "${env.BUILD_NUMBER}"
-    ECS_CLUSTER          = 'my-ecs-cluster-automated-deploy'
-    SERVICE          = 'my-ecs-service-automated-deploy'
-    TASK_FAMILY      = 'python-app-task-automated'
-    TASK_DEFINITION_NAME = 'automated-deploy-task'
-    CONTAINER_NAME = 'my-app-container'
-    ECR_REGISTRY = '115456585578.dkr.ecr.us-east-1.amazonaws.com'
-
-  }
-
-  stages {
-    stage('Checkout Code') {
-      steps {
-        git branch: 'main', credentialsId: 'git-credentials', url: 'https://github.com/sanjeev0575/DevOps.git'
-      }
+    environment {
+        AWS_REGION = 'us-east-1'
+        AWS_ACCOUNT_ID = '115456585578'
+        ECR_REPOSITORY = 'devops'
+        IMAGE_TAG = "${env.BUILD_NUMBER}"
+        ECS_CLUSTER = 'my-ecs-cluster-automated-deploy'
+        ECS_SERVICE = 'my-ecs-service-automated-deploy'
+        TASK_FAMILY = 'python-app-task-automated'
+        TASK_DEFINITION_NAME = 'automated-deploy-task'
+        CONTAINER_NAME = 'my-app-container'
     }
 
-    stage('Build Docker Image') {
-      steps {
-        script {
-          dockerImage = docker.build("${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:${IMAGE_TAG}")
+    stages {
+        stage('Checkout Code') {
+            steps {
+                git branch: 'main', credentialsId: 'git-credentials', url: 'https://github.com/sanjeev0575/DevOps.git'
+            }
         }
-      }
-    }
 
-    stage('Login to ECR') {
-      steps {
-        withCredentials([aws(
-          credentialsId: 'aws-cred',
-          accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-          secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-        )]) {
-          sh '''
-            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
-            docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:${IMAGE_TAG}
-          '''
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    dockerImage = docker.build("${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:${IMAGE_TAG}")
+                }
+            }
         }
-      }
+
+        stage('Login to ECR') {
+            steps {
+                withCredentials([aws(
+                    credentialsId: 'aws-cred',
+                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                )]) {
+                    sh '''
+                        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+                    '''
+                }
+            }
+        }
+
+        stage('Push to ECR') {
+            steps {
+                script {
+                    dockerImage.push()
+                    dockerImage.push('latest')
+                }
+            }
+        }
+
+        stage('Update Task Definition') {
+            steps {
+                withCredentials([aws(
+                    credentialsId: 'aws-cred',
+                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                )]) {
+                    script {
+                        // Render task definition
+                        sh '''
+                            echo "Using IMAGE_TAG: ${IMAGE_TAG}"
+                            envsubst < task-definition-template.json > task-definition-rendered.json
+                            echo "--- Rendered JSON ---"
+                            cat task-definition-rendered.json
+                            echo "--- Validating JSON ---"
+                            jq . task-definition-rendered.json
+                        '''
+
+                        // Register task definition and capture ARN
+                        def taskDefinitionOutput = sh(
+                            script: '''
+                                aws ecs register-task-definition \
+                                    --cli-input-json file://task-definition-rendered.json \
+                                    --region ${AWS_REGION} \
+                                    --query 'taskDefinition.taskDefinitionArn' \
+                                    --output text
+                            ''',
+                            returnStdout: true
+                        ).trim()
+                        env.TASK_DEFINITION_ARN = taskDefinitionOutput
+                        echo "Registered Task Definition ARN: ${TASK_DEFINITION_ARN}"
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to ECS') {
+            steps {
+                withCredentials([aws(
+                    credentialsId: 'aws-cred',
+                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                )]) {
+                    script {
+                        sh '''
+                            aws ecs update-service \
+                                --cluster ${ECS_CLUSTER} \
+                                --service ${ECS_SERVICE} \
+                                --task-definition ${TASK_DEFINITION_ARN} \
+                                --force-new-deployment \
+                                --region ${AWS_REGION}
+                        '''
+                    }
+                }
+            }
+        }
     }
-    stage('Update Task Definition') {
-  steps {
-    withCredentials([aws(
-      credentialsId: 'aws-cred',
-      accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-      secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-    )]) {
-      sh """
-        echo "Using IMAGE_TAG: ${IMAGE_TAG}"
 
-        export AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID}
-        export AWS_REGION=${AWS_REGION}
-        export ECR_REPOSITORY=${ECR_REPOSITORY}
-        export ECR_REGISTRY=${ECR_REGISTRY}
-        export IMAGE_TAG=${IMAGE_TAG}
-        export CONTAINER_NAME=${CONTAINER_NAME}
-        export TASK_DEFINITION_NAME=${TASK_DEFINITION_NAME}
-
-        echo "--- Rendering ECS task definition ---"
-        envsubst < task-definition-template.json > task-definition-rendered.json
-
-        echo "--- Rendered JSON ---"
-        cat task-definition-rendered.json
-
-        echo "--- Validating JSON ---"
-        jq . task-definition-rendered.json
-
-        echo "--- Registering ECS Task ---"
-        aws ecs register-task-definition \
-          --cli-input-json file://task-definition-rendered.json \
-          --region ${AWS_REGION}
-      """
+    post {
+        always {
+            sh 'docker system prune -f'
+        }
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed. Check logs for details.'
+        }
     }
-  }
 }
-stage('Deploy to ECS') {
-    steps {
-      script {
-        withCredentials([aws(
-          credentialsId: 'aws-cred',
-          accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-          secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-          )]) {
-        // Get latest task definition ARN
-        def taskDefinitionArn = sh(script: """
-            aws ecs list-task-definitions --family-prefix ${TASK_DEFINITION_NAME} --region ${AWS_REGION} --query 'taskDefinitionArns[-1]' --output text
-          """, returnStdout: true).trim()
-
-          // Update ECS service
-          sh """
-            aws ecs update-service --cluster ${ECS_CLUSTER} --service ${ECS_SERVICE} --task-definition ${taskDefinitionArn} --region ${AWS_REGION}
-          """
-          }
-      }
-
-      }
-    }
-
-
-
-  }
-}
-
-    
-    // AWS_REGION = 'us-east-1'
-    // ECR_REGISTRY = '115456585578.dkr.ecr.us-east-1.amazonaws.com'
-    // ECR_REPOSITORY = 'my-app-repo'
-    // ECS_CLUSTER = 'my-app-cluster'
-    // ECS_SERVICE = 'my-app-service'
-    // TASK_DEFINITION_NAME = 'my-app-task'
-    // CONTAINER_NAME = 'my-app-container'
-    // IMAGE_TAG = "${env.BUILD_NUMBER}
