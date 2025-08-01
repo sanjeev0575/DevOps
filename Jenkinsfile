@@ -323,6 +323,11 @@ pipeline {
 stage('Deploy to ECS') {
     steps {
       script {
+        withCredentials([aws(
+          credentialsId: 'aws-cred',
+          accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+          secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+          )]) {
         // Get latest task definition ARN
         def taskDefinitionArn = sh(script: """
             aws ecs list-task-definitions --family-prefix ${TASK_DEFINITION_NAME} --region ${AWS_REGION} --query 'taskDefinitionArns[-1]' --output text
@@ -332,7 +337,9 @@ stage('Deploy to ECS') {
           sh """
             aws ecs update-service --cluster ${ECS_CLUSTER} --service ${ECS_SERVICE} --task-definition ${taskDefinitionArn} --region ${AWS_REGION}
           """
-        }
+          }
+      }
+
       }
     }
 
