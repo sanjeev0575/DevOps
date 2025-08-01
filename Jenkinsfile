@@ -279,17 +279,20 @@ pipeline {
           secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
         )]) {
           sh '''
+            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
             aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+            docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${IMAGE_TAG}
           '''
         }
       }
     }
 
-    stage('Push Docker Image to ECR') {
-      steps {
-        sh "docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${IMAGE_TAG}"
-      }
-    }
+    // stage('Push Docker Image to ECR') {
+    //   steps {
+    //     sh "docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${IMAGE_TAG}"
+    //   }
+    // }
 
     // stage('Update Task Definition') {
     //   steps {
