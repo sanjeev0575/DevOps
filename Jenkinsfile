@@ -285,79 +285,42 @@ pipeline {
         }
       }
     }
-    // stage('Update Task Definition') {
-    //   steps {
-    //     script {
-    //       // Update task-definition.json with new image
-    //       sh """
-    //         sed -i 's|${ECR_REGISTRY}/${ECR_REPOSITORY}:.*|${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}|' task-definition.json
-    //         aws ecs register-task-definition --cli-input-json file://task-definition.json --region ${AWS_REGION}
-    //       """
-    //     }
-    //   }
-    // }
-  // stage('Update Task Definition') {
-  //   steps {
-  //     script {
-  //       sh """
-  //         export TASK_FAMILY=${TASK_FAMILY}
-  //         export CONTAINER_NAME=${CONTAINER_NAME}
-  //         export IMAGE_TAG=${IMAGE_TAG}
-  //         export AWS_REGION=${AWS_REGION}
-  //         export AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID}
-  //         export ECR_REPOSITORY=${ECR_REPOSITORY}
-  //         export ECR_REGISTRY=${ECR_REGISTRY}
+    stage('Update Task Definition') {
+  steps {
+    withCredentials([aws(
+      credentialsId: 'aws-cred',
+      accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+      secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+    )]) {
+      sh """
+        echo "Using IMAGE_TAG: ${IMAGE_TAG}"
 
-  //         envsubst < task-definition-template.json > task-definition.json
+        export AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID}
+        export AWS_REGION=${AWS_REGION}
+        export ECR_REPOSITORY=${ECR_REPOSITORY}
+        export ECR_REGISTRY=${ECR_REGISTRY}
+        export IMAGE_TAG=${IMAGE_TAG}
+        export CONTAINER_NAME=${CONTAINER_NAME}
+        export TASK_DEFINITION_NAME=${TASK_DEFINITION_NAME}
 
-  //         echo '==== Rendered task-definition.json ===='
-  //         cat task-definition.json
+        echo "--- Rendering ECS task definition ---"
+        envsubst < task-definition-template.json > task-definition-rendered.json
 
-  //         echo '==== Validating JSON ===='
-  //         jq . task-definition.json
+        echo "--- Rendered JSON ---"
+        cat task-definition-rendered.json
 
-  //         echo '==== Registering task ===='
-  //         aws ecs register-task-definition --cli-input-json file://task-definition-rendered.json
+        echo "--- Validating JSON ---"
+        jq . task-definition-rendered.json
 
-  //       """
-  //       }
-  //     }
-  //   }
-  stage('Update Task Definition') {
-    steps {
-      withCredentials([aws(
-        credentialsId: 'aws-cred',
-        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-        )]) {
-        sh '''
-          #— export all vars so envsubst can see them
-          export AWS_ACCOUNT_ID='115456585578'
-          export AWS_REGION='us-east-1'
-          export IMAGE_TAG=${IMAGE_TAG}
-          export ECR_REPOSITORY='devops'
-          export ECR_REGISTRY='115456585578.dkr.ecr.us-east-1.amazonaws.com'
-          export IMAGE_TAG='${BUILD_NUMBER}'
-          export CONTAINER_NAME='my-app-container'
-          export TASK_DEFINITION_NAME='automated-deploy-task'
-
-          #— render template into valid JSON
-          envsubst < task-definition-template.json > task-definition-rendered.json
-
-          #— debug / validate
-          echo '---- rendered task-definition ----'
-          cat task-definition-rendered.json
-          echo '---- validating JSON via jq ----'
-          jq . task-definition-rendered.json
-
-          #— register with ECS
-          aws ecs register-task-definition \
-            --cli-input-json file://task-definition-rendered.json \
-            --region $AWS_REGION
-          '''
-        }
-      }
+        echo "--- Registering ECS Task ---"
+        aws ecs register-task-definition \
+          --cli-input-json file://task-definition-rendered.json \
+          --region ${AWS_REGION}
+      """
     }
+  }
+}
+
 
 
 
