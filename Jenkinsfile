@@ -285,17 +285,29 @@ pipeline {
         }
       }
     }
-    stage('Update Task Definition') {
-      steps {
-        script {
-          // Update task-definition.json with new image
-          sh """
-            sed -i 's|${ECR_REGISTRY}/${ECR_REPOSITORY}:.*|${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}|' task-definition.json
-            aws ecs register-task-definition --cli-input-json file://task-definition.json --region ${AWS_REGION}
-          """
-        }
+    // stage('Update Task Definition') {
+    //   steps {
+    //     script {
+    //       // Update task-definition.json with new image
+    //       sh """
+    //         sed -i 's|${ECR_REGISTRY}/${ECR_REPOSITORY}:.*|${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}|' task-definition.json
+    //         aws ecs register-task-definition --cli-input-json file://task-definition.json --region ${AWS_REGION}
+    //       """
+    //     }
+    //   }
+    // }
+  stage('Update Task Definition') {
+    steps {
+      script {
+        sh """
+          sed -i 's|\\(\"image\": *\\\"${ECR_REGISTRY}/${ECR_REPOSITORY}:\\)[^\\"]*|\\1${IMAGE_TAG}|' task-definition.json
+          cat task-definition.json  # Optional: view result
+          aws ecs register-task-definition --cli-input-json file://task-definition.json --region ${AWS_REGION}
+        """
       }
     }
+  }
+
   }
 }
 
