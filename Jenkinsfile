@@ -245,14 +245,14 @@ pipeline {
     AWS_ACCOUNT_ID   = '115456585578'
     ECR_REPO         = 'devops'
     IMAGE_TAG        = "${env.BUILD_NUMBER}"
-    CLUSTER          = 'my-ecs-cluster'
-    SERVICE          = 'my-ecs-service'
-    TASK_FAMILY      = 'python-app-task'
-    TASK_ROLE_ARN    = 'arn:aws:iam::115456585578:role/ecsTaskExecutionRole'
-    SUBNETS          = 'subnet-0cefa984039dbc9df,subnet-00d20a28ebb69e58e'
-    SECURITY_GROUPS  = 'sg-017eeb5250435bd47'
-    //TARGET_GROUP_ARN = 'aarn:aws:elasticloadbalancing:us-east-1:115456585578:targetgroup/my-python-app-tg/c5a4165738f30115' // Update with correct ARN
-    TARGET_GROUP_ARN = 'arn:aws:elasticloadbalancing:us-east-1:115456585578:listener/app/simple-application/df4c92b13fd4b139/5c039e2c260350a7'
+    // CLUSTER          = 'my-ecs-cluster'
+    // SERVICE          = 'my-ecs-service'
+    // TASK_FAMILY      = 'python-app-task'
+    // TASK_ROLE_ARN    = 'arn:aws:iam::115456585578:role/ecsTaskExecutionRole'
+    // SUBNETS          = 'subnet-0cefa984039dbc9df,subnet-00d20a28ebb69e58e'
+    // SECURITY_GROUPS  = 'sg-017eeb5250435bd47'
+    // //TARGET_GROUP_ARN = 'aarn:aws:elasticloadbalancing:us-east-1:115456585578:targetgroup/my-python-app-tg/c5a4165738f30115' // Update with correct ARN
+    // TARGET_GROUP_ARN = 'arn:aws:elasticloadbalancing:us-east-1:115456585578:listener/app/simple-application/df4c92b13fd4b139/5c039e2c260350a7'
 
   }
 
@@ -291,99 +291,99 @@ pipeline {
       }
     }
 
-    stage('Update Task Definition') {
-      steps {
-        withCredentials([aws(
-          credentialsId: 'aws-cred',
-          accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-          secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-        )])  {
-        sh '''
-          cat > task-definition.json <<EOF
-          {
-            "family": "${TASK_FAMILY}",
-            "networkMode": "awsvpc",
-            "containerDefinitions": [
-              {
-                "name": "python-app",
-                "image": "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${IMAGE_TAG}",
-                "essential": true,
-                "portMappings": [
-                  {
-                    "containerPort": 5000,
-                    "hostPort": 5000,
-                    "protocol": "tcp"
-                  }
-                ],
-                "logConfiguration": {
-                  "logDriver": "awslogs",
-                  "options": {
-                    "awslogs-group": "/ecs/python-app",
-                    "awslogs-region": "${AWS_REGION}",
-                    "awslogs-stream-prefix": "ecs"
-                  }
-                }
-              }
-            ],
-            "requiresCompatibilities": ["FARGATE"],
-            "cpu": "256",
-            "memory": "512",
-            "executionRoleArn": "${TASK_ROLE_ARN}",
-            "taskRoleArn": "${TASK_ROLE_ARN}"
-          }
-          EOF
-          aws ecs register-task-definition --cli-input-json file://task-definition.json --region $AWS_REGION
-        '''
-      }
-    }
-    }
-    stage('Check or Create ECS Service') {
-      steps {
-        withCredentials([aws(
-          credentialsId: 'aws-cred',
-          accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-          secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-        )]) {
-        sh '''
-          SERVICE_STATUS=$(aws ecs describe-services --cluster $CLUSTER --services $SERVICE --region $AWS_REGION --query 'services[0].status' --output text || echo "NONE")
-          if [ "$SERVICE_STATUS" != "ACTIVE" ]; then
-            echo "Service does not exist or is not ACTIVE. Creating service..."
-            aws ecs create-service \
-              --cluster $CLUSTER \
-              --service-name $SERVICE \
-              --task-definition $TASK_FAMILY \
-              --desired-count 1 \
-              --launch-type FARGATE \
-              --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SECURITY_GROUPS],assignPublicIp=ENABLED}" \
-              --load-balancers "targetGroupArn=$TARGET_GROUP_ARN,containerName=python-app,containerPort=5000" \
-              --region $AWS_REGION
-          else
-            echo "Service is ACTIVE. Proceeding to update..."
-            aws ecs update-service \
-              --cluster $CLUSTER \
-              --service $SERVICE \
-              --task-definition $TASK_FAMILY \
-              --force-new-deployment \
-              --region $AWS_REGION
-          fi
-        '''
-      }
-    }
-    }
-    stage('Verify Deployment') {
-      steps {
-        withCredentials([aws(
-          credentialsId: 'aws-cred',
-          accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-          secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-        )]){
-        sh '''
-          aws ecs wait services-stable --cluster $CLUSTER --services $SERVICE --region $AWS_REGION
-          aws ecs describe-services --cluster $CLUSTER --services $SERVICE --region $AWS_REGION
-        '''
-      }
-    }
-    }
+    // stage('Update Task Definition') {
+    //   steps {
+    //     withCredentials([aws(
+    //       credentialsId: 'aws-cred',
+    //       accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+    //       secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+    //     )])  {
+    //     sh '''
+    //       cat > task-definition.json <<EOF
+    //       {
+    //         "family": "${TASK_FAMILY}",
+    //         "networkMode": "awsvpc",
+    //         "containerDefinitions": [
+    //           {
+    //             "name": "python-app",
+    //             "image": "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${IMAGE_TAG}",
+    //             "essential": true,
+    //             "portMappings": [
+    //               {
+    //                 "containerPort": 5000,
+    //                 "hostPort": 5000,
+    //                 "protocol": "tcp"
+    //               }
+    //             ],
+    //             "logConfiguration": {
+    //               "logDriver": "awslogs",
+    //               "options": {
+    //                 "awslogs-group": "/ecs/python-app",
+    //                 "awslogs-region": "${AWS_REGION}",
+    //                 "awslogs-stream-prefix": "ecs"
+    //               }
+    //             }
+    //           }
+    //         ],
+    //         "requiresCompatibilities": ["FARGATE"],
+    //         "cpu": "256",
+    //         "memory": "512",
+    //         "executionRoleArn": "${TASK_ROLE_ARN}",
+    //         "taskRoleArn": "${TASK_ROLE_ARN}"
+    //       }
+    //       EOF
+    //       aws ecs register-task-definition --cli-input-json file://task-definition.json --region $AWS_REGION
+    //     '''
+    //   }
+    // }
+    // }
+    // stage('Check or Create ECS Service') {
+    //   steps {
+    //     withCredentials([aws(
+    //       credentialsId: 'aws-cred',
+    //       accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+    //       secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+    //     )]) {
+    //     sh '''
+    //       SERVICE_STATUS=$(aws ecs describe-services --cluster $CLUSTER --services $SERVICE --region $AWS_REGION --query 'services[0].status' --output text || echo "NONE")
+    //       if [ "$SERVICE_STATUS" != "ACTIVE" ]; then
+    //         echo "Service does not exist or is not ACTIVE. Creating service..."
+    //         aws ecs create-service \
+    //           --cluster $CLUSTER \
+    //           --service-name $SERVICE \
+    //           --task-definition $TASK_FAMILY \
+    //           --desired-count 1 \
+    //           --launch-type FARGATE \
+    //           --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SECURITY_GROUPS],assignPublicIp=ENABLED}" \
+    //           --load-balancers "targetGroupArn=$TARGET_GROUP_ARN,containerName=python-app,containerPort=5000" \
+    //           --region $AWS_REGION
+    //       else
+    //         echo "Service is ACTIVE. Proceeding to update..."
+    //         aws ecs update-service \
+    //           --cluster $CLUSTER \
+    //           --service $SERVICE \
+    //           --task-definition $TASK_FAMILY \
+    //           --force-new-deployment \
+    //           --region $AWS_REGION
+    //       fi
+    //     '''
+    //   }
+    // }
+    // }
+    // stage('Verify Deployment') {
+    //   steps {
+    //     withCredentials([aws(
+    //       credentialsId: 'aws-cred',
+    //       accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+    //       secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+    //     )]){
+    //     sh '''
+    //       aws ecs wait services-stable --cluster $CLUSTER --services $SERVICE --region $AWS_REGION
+    //       aws ecs describe-services --cluster $CLUSTER --services $SERVICE --region $AWS_REGION
+    //     '''
+    //   }
+    // }
+    // }
     stage('Cleanup Docker Images') {
       steps {
         sh '''
