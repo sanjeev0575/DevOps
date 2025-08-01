@@ -334,6 +334,7 @@ pipeline {
           #— export all vars so envsubst can see them
           export AWS_ACCOUNT_ID='115456585578'
           export AWS_REGION='us-east-1'
+          export IMAGE_TAG=${IMAGE_TAG}
           export ECR_REPOSITORY='devops'
           export ECR_REGISTRY='115456585578.dkr.ecr.us-east-1.amazonaws.com'
           export IMAGE_TAG='${BUILD_NUMBER}'
