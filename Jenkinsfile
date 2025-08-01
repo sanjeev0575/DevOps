@@ -320,7 +320,21 @@ pipeline {
     }
   }
 }
+stage('Deploy to ECS') {
+    steps {
+      script {
+        // Get latest task definition ARN
+        def taskDefinitionArn = sh(script: """
+            aws ecs list-task-definitions --family-prefix ${TASK_DEFINITION_NAME} --region ${AWS_REGION} --query 'taskDefinitionArns[-1]' --output text
+          """, returnStdout: true).trim()
 
+          // Update ECS service
+          sh """
+            aws ecs update-service --cluster ${ECS_CLUSTER} --service ${ECS_SERVICE} --task-definition ${taskDefinitionArn} --region ${AWS_REGION}
+          """
+        }
+      }
+    }
 
 
 
