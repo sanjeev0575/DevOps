@@ -10,12 +10,13 @@
       "name": "${CONTAINER_NAME}",
       "image": "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}",
       "essential": true,
+      // "portMappings": [
+      //   { "containerPort": 5000, "hostPort": 5000, "protocol": "tcp" }
+      // ]
       "portMappings": [
-        {
-          "containerPort": 5000,
-          "protocol": "tcp"
-        }
-      ],
+        { "containerPort": 5000, "protocol": "tcp" }
+      ]
+      ,
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {

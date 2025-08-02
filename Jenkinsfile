@@ -5,7 +5,8 @@ pipeline {
         AWS_REGION           = 'us-east-1'
         AWS_ACCOUNT_ID       = '115456585578'
         ECR_REPOSITORY       = 'devops'
-        IMAGE_TAG            = "${env.BUILD_NUMBER}"
+        ECR_REGISTRY         = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+        IMAGE_TAG            = "${BUILD_NUMBER}"
         ECS_CLUSTER          = 'my-ecs-cluster-automated-deploy'
         ECS_SERVICE          = 'my-ecs-service-automated-deploy'
         TASK_FAMILY          = 'python-app-task-automated'
@@ -25,7 +26,7 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    dockerImage = docker.build("${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:${IMAGE_TAG}")
+                    dockerImage = docker.build("${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}")
                 }
             }
         }
@@ -34,7 +35,7 @@ pipeline {
             steps {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                     sh '''
-                        aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+                        aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
                     '''
                 }
             }
@@ -54,7 +55,6 @@ pipeline {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                     script {
                         sh '''
-                            echo "Using IMAGE_TAG: ${IMAGE_TAG}"
                             envsubst < task-definition-template.json > task-definition-rendered.json
                             jq . task-definition-rendered.json
                         '''
