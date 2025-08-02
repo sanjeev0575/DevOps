@@ -14,8 +14,8 @@ pipeline {
         CONTAINER_NAME       = 'my-app-container'
         SUBNET_IDS           = 'subnet-01d7c4a4a6f9235e6,subnet-01c1ca97fe8b13fb1'
         SECURITY_GROUP_IDS   = 'sg-0644fd647017edcbf'
-        LOAD_BALANCER_NAME   = 'automated-flask-alb'
-        TARGET_GROUP_NAME    = 'flask-target-group'
+        LOAD_BALANCER_NAME = "automated-flask-alb-${BUILD_NUMBER}"
+        TARGET_GROUP_NAME  = "flask-tg-${BUILD_NUMBER}"
         LISTENER_PORT        = '80'
     }
 
