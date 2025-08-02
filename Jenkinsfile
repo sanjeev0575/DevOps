@@ -144,10 +144,15 @@ pipeline {
                             fi
 
                             echo "🔍 Checking if Listener exists..."
+                            // LISTENER_ARN=$(aws elbv2 describe-listeners \
+                            //     --load-balancer-arn $LB_ARN \
+                            //     --region ${AWS_REGION} \
+                            //     --query 'Listeners[?Port==\`${LISTENER_PORT}\`].ListenerArn' \
+                            //     --output text 2>/dev/null || echo "")
                             LISTENER_ARN=$(aws elbv2 describe-listeners \
                                 --load-balancer-arn $LB_ARN \
                                 --region ${AWS_REGION} \
-                                --query 'Listeners[?Port==\`${LISTENER_PORT}\`].ListenerArn' \
+                                --query 'Listeners[?Port==`'"${LISTENER_PORT}"'`].ListenerArn' \
                                 --output text 2>/dev/null || echo "")
 
                             if [ -z "$LISTENER_ARN" ]; then
