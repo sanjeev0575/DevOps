@@ -560,6 +560,11 @@ pipeline {
     
         stage('Wait for ECS Service Stability (Custom Wait)') {
             steps {
+                withCredentials([aws(
+                     credentialsId: 'aws-cred',
+                     accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                     secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                 )]) {
                 script {
                     def maxAttempts = 30  // ~15 min if sleep 30s
                     def delay = 30
@@ -581,6 +586,7 @@ pipeline {
                             error("Service did not stabilize within ${maxAttempts * delay / 60} minutes.")
                         }
                     }
+                }
                 }
             }
         }
