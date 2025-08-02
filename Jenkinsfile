@@ -149,11 +149,17 @@ pipeline {
                             //     --region ${AWS_REGION} \
                             //     --query 'Listeners[?Port==\`${LISTENER_PORT}\`].ListenerArn' \
                             //     --output text 2>/dev/null || echo "")
+                            // LISTENER_ARN=$(aws elbv2 describe-listeners \
+                            //     --load-balancer-arn $LB_ARN \
+                            //     --region ${AWS_REGION} \
+                            //     --query 'Listeners[?Port==`'"${LISTENER_PORT}"'`].ListenerArn' \
+                            //     --output text 2>/dev/null || echo "")
                             LISTENER_ARN=$(aws elbv2 describe-listeners \
-                                --load-balancer-arn $LB_ARN \
-                                --region ${AWS_REGION} \
-                                --query 'Listeners[?Port==`'"${LISTENER_PORT}"'`].ListenerArn' \
-                                --output text 2>/dev/null || echo "")
+                                    --load-balancer-arn $LB_ARN \
+                                    --region ${AWS_REGION} \
+                                    --query 'Listeners[?Port==`'"${LISTENER_PORT}"'`].ListenerArn' \
+                                    --output text 2>/dev/null || echo "")
+
 
                             if [ -z "$LISTENER_ARN" ]; then
                                 aws elbv2 create-listener \
