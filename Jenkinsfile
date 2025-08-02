@@ -103,15 +103,15 @@ pipeline {
             steps {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                     script {
-                        sh '''
+                        sh '''#!/bin/sh
                             echo "🔍 Checking if Load Balancer exists..."
                             LB_ARN=$(aws elbv2 describe-load-balancers --names ${LOAD_BALANCER_NAME} --region ${AWS_REGION} --query 'LoadBalancers[0].LoadBalancerArn' --output text 2>/dev/null || echo "")
-                            
+
                             if [ -z "$LB_ARN" ]; then
                                 echo "🔧 Creating Load Balancer..."
                                 LB_ARN=$(aws elbv2 create-load-balancer \
                                     --name ${LOAD_BALANCER_NAME} \
-                                    --subnets ${SUBNET_IDS//,/ } \
+                                    --subnets $(echo ${SUBNET_IDS} | tr ',' ' ') \
                                     --security-groups ${SECURITY_GROUP_IDS} \
                                     --scheme internet-facing \
                                     --type application \
@@ -121,7 +121,7 @@ pipeline {
 
                             echo "🔍 Checking if Target Group exists..."
                             TG_ARN=$(aws elbv2 describe-target-groups --names ${TARGET_GROUP_NAME} --region ${AWS_REGION} --query 'TargetGroups[0].TargetGroupArn' --output text 2>/dev/null || echo "")
-                            
+
                             if [ -z "$TG_ARN" ]; then
                                 echo "🔧 Creating Target Group..."
                                 TG_ARN=$(aws elbv2 create-target-group \
@@ -138,9 +138,9 @@ pipeline {
                             LISTENER_ARN=$(aws elbv2 describe-listeners \
                                 --load-balancer-arn $LB_ARN \
                                 --region ${AWS_REGION} \
-                                --query 'Listeners[?Port==`'${LISTENER_PORT}'`].ListenerArn' \
+                                --query 'Listeners[?Port==\'${LISTENER_PORT}\'].ListenerArn' \
                                 --output text 2>/dev/null || echo "")
-                            
+
                             if [ -z "$LISTENER_ARN" ]; then
                                 aws elbv2 create-listener \
                                     --load-balancer-arn $LB_ARN \
