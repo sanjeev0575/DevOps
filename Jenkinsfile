@@ -140,7 +140,7 @@ pipeline {
                             LISTENER_ARN=$(aws elbv2 describe-listeners \
                                 --load-balancer-arn $LB_ARN \
                                 --region ${AWS_REGION} \
-                                --query 'Listeners[?Port==\'${LISTENER_PORT}\'].ListenerArn' \
+                                --query 'Listeners[?Port==\\`${LISTENER_PORT}\\`].ListenerArn' \
                                 --output text 2>/dev/null || echo "")
 
                             if [ -z "$LISTENER_ARN" ]; then
@@ -152,16 +152,28 @@ pipeline {
                                     --region ${AWS_REGION}
                             fi
 
+                            # Fail early if TG_ARN is still empty
+                            if [ -z "$TG_ARN" ]; then
+                                echo "❌ TG_ARN is empty. Cannot continue."
+                                exit 1
+                            fi
+
                             echo "TG_ARN=$TG_ARN" >> env.properties
                         '''
-                        script {
-                            def props = readProperties file: 'env.properties'
-                            env.TG_ARN = props.TG_ARN
+
+                        // Check file exists before reading
+                        if (!fileExists('env.properties')) {
+                            error("❌ env.properties file not found! Likely failure in LB or TG creation.")
                         }
+
+                        def props = readProperties file: 'env.properties'
+                        env.TG_ARN = props.TG_ARN
+                        echo "✔️ TG_ARN read from env.properties: ${env.TG_ARN}"
                     }
                 }
             }
         }
+
 
         stage('Check or Create ECS Service') {
             steps {
