@@ -237,6 +237,132 @@
 //   }
 // }
 
+// pipeline {
+//     agent any
+
+//     environment {
+//         AWS_REGION = 'us-east-1'
+//         AWS_ACCOUNT_ID = '115456585578'
+//         ECR_REPOSITORY = 'devops'
+//         IMAGE_TAG = "${env.BUILD_NUMBER}"
+//         ECS_CLUSTER = 'my-ecs-cluster-automated-deploy'
+//         ECS_SERVICE = 'my-ecs-service-automated-deploy'
+//         TASK_FAMILY = 'python-app-task-automated'
+//         TASK_DEFINITION_NAME = 'automated-deploy-task'
+//         CONTAINER_NAME = 'my-app-container'
+//     }
+
+//     stages {
+//         stage('Checkout Code') {
+//             steps {
+//                 git branch: 'main', credentialsId: 'git-credentials', url: 'https://github.com/sanjeev0575/DevOps.git'
+//             }
+//         }
+
+//         stage('Build Docker Image') {
+//             steps {
+//                 script {
+//                     dockerImage = docker.build("${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:${IMAGE_TAG}")
+//                 }
+//             }
+//         }
+
+//         stage('Login to ECR') {
+//             steps {
+//                 withCredentials([aws(
+//                     credentialsId: 'aws-cred',
+//                     accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+//                     secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+//                 )]) {
+//                     sh '''
+//                         aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+//                     '''
+//                 }
+//             }
+//         }
+
+//         stage('Push to ECR') {
+//             steps {
+//                 script {
+//                     dockerImage.push()
+//                     dockerImage.push('latest')
+//                 }
+//             }
+//         }
+
+//         stage('Update Task Definition') {
+//             steps {
+//                 withCredentials([aws(
+//                     credentialsId: 'aws-cred',
+//                     accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+//                     secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+//                 )]) {
+//                     script {
+//                         // Render task definition
+//                         sh '''
+//                             echo "Using IMAGE_TAG: ${IMAGE_TAG}"
+//                             envsubst < task-definition-template.json > task-definition-rendered.json
+//                             echo "--- Rendered JSON ---"
+//                             cat task-definition-rendered.json
+//                             echo "--- Validating JSON ---"
+//                             jq . task-definition-rendered.json
+//                         '''
+
+//                         // Register task definition and capture ARN
+//                         def taskDefinitionOutput = sh(
+//                             script: '''
+//                                 aws ecs register-task-definition \
+//                                     --cli-input-json file://task-definition-rendered.json \
+//                                     --region ${AWS_REGION} \
+//                                     --query 'taskDefinition.taskDefinitionArn' \
+//                                     --output text
+//                             ''',
+//                             returnStdout: true
+//                         ).trim()
+//                         env.TASK_DEFINITION_ARN = taskDefinitionOutput
+//                         echo "Registered Task Definition ARN: ${TASK_DEFINITION_ARN}"
+//                     }
+//                 }
+//             }
+//         }
+
+//         stage('Deploy to ECS') {
+//             steps {
+//                 withCredentials([aws(
+//                     credentialsId: 'aws-cred',
+//                     accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+//                     secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+//                 )]) {
+//                     script {
+//                         sh '''
+//                             aws ecs update-service \
+//                                 --cluster ${ECS_CLUSTER} \
+//                                 --service ${ECS_SERVICE} \
+//                                 --task-definition ${TASK_DEFINITION_ARN} \
+//                                 --force-new-deployment \
+//                                 --region ${AWS_REGION}
+//                         '''
+//                     }
+//                 }
+//             }
+//         }
+//     }
+
+//     post {
+//         always {
+//             sh 'docker system prune -f'
+//         }
+//         success {
+//             echo 'Pipeline completed successfully!'
+//         }
+//         failure {
+//             echo 'Pipeline failed. Check logs for details.'
+//         }
+//     }
+// }
+
+
+
 pipeline {
     agent any
 
@@ -250,6 +376,9 @@ pipeline {
         TASK_FAMILY = 'python-app-task-automated'
         TASK_DEFINITION_NAME = 'automated-deploy-task'
         CONTAINER_NAME = 'my-app-container'
+        // Add your VPC subnet and security group IDs
+        SUBNET_IDS = 'subnet-01d7c4a4a6f9235e6,subnet-01c1ca97fe8b13fb1' // Replace with actual subnet IDs
+        SECURITY_GROUP_IDS = 'sg-0644fd647017edcbf' // Replace with actual security group ID
     }
 
     stages {
@@ -262,7 +391,11 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    dockerImage = docker.build("${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:${IMAGE_TAG}")
+                    try {
+                        dockerImage = docker.build("${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:${IMAGE_TAG}")
+                    } catch (Exception e) {
+                        error "Failed to build Docker image: ${e}"
+                    }
                 }
             }
         }
@@ -275,7 +408,7 @@ pipeline {
                     secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
                 )]) {
                     sh '''
-                        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+                        aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
                     '''
                 }
             }
@@ -284,8 +417,12 @@ pipeline {
         stage('Push to ECR') {
             steps {
                 script {
-                    dockerImage.push()
-                    dockerImage.push('latest')
+                    try {
+                        dockerImage.push()
+                        dockerImage.push('latest')
+                    } catch (Exception e) {
+                        error "Failed to push Docker image to ECR: ${e}"
+                    }
                 }
             }
         }
@@ -298,29 +435,75 @@ pipeline {
                     secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
                 )]) {
                     script {
-                        // Render task definition
-                        sh '''
-                            echo "Using IMAGE_TAG: ${IMAGE_TAG}"
-                            envsubst < task-definition-template.json > task-definition-rendered.json
-                            echo "--- Rendered JSON ---"
-                            cat task-definition-rendered.json
-                            echo "--- Validating JSON ---"
-                            jq . task-definition-rendered.json
-                        '''
+                        try {
+                            sh '''
+                                echo "Using IMAGE_TAG: ${IMAGE_TAG}"
+                                envsubst < task-definition-template.json > task-definition-rendered.json
+                                echo "--- Rendered JSON ---"
+                                cat task-definition-rendered.json
+                                echo "--- Validating JSON ---"
+                                jq . task-definition-rendered.json
+                            '''
 
-                        // Register task definition and capture ARN
-                        def taskDefinitionOutput = sh(
-                            script: '''
-                                aws ecs register-task-definition \
-                                    --cli-input-json file://task-definition-rendered.json \
-                                    --region ${AWS_REGION} \
-                                    --query 'taskDefinition.taskDefinitionArn' \
-                                    --output text
-                            ''',
-                            returnStdout: true
-                        ).trim()
-                        env.TASK_DEFINITION_ARN = taskDefinitionOutput
-                        echo "Registered Task Definition ARN: ${TASK_DEFINITION_ARN}"
+                            def taskDefinitionOutput = sh(
+                                script: '''
+                                    aws ecs register-task-definition \
+                                        --cli-input-json file://task-definition-rendered.json \
+                                        --region ${AWS_REGION} \
+                                        --query 'taskDefinition.taskDefinitionArn' \
+                                        --output text
+                                ''',
+                                returnStdout: true
+                            ).trim()
+                            env.TASK_DEFINITION_ARN = taskDefinitionOutput
+                            echo "Registered Task Definition ARN: ${TASK_DEFINITION_ARN}"
+                        } catch (Exception e) {
+                            error "Failed to register task definition: ${e}"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Check or Create ECS Service') {
+            steps {
+                withCredentials([aws(
+                    credentialsId: 'aws-cred',
+                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                )]) {
+                    script {
+                        try {
+                            def serviceExists = sh(
+                                script: """
+                                    aws ecs describe-services \
+                                        --cluster ${ECS_CLUSTER} \
+                                        --services ${ECS_SERVICE} \
+                                        --region ${AWS_REGION} \
+                                        --query 'services[0].status' \
+                                        --output text || echo 'NONE'
+                                """,
+                                returnStdout: true
+                            ).trim()
+
+                            if (serviceExists == 'ACTIVE') {
+                                echo "Service ${ECS_SERVICE} exists and is active."
+                            } else {
+                                echo "Service ${ECS_SERVICE} not found. Creating it..."
+                                sh """
+                                    aws ecs create-service \
+                                        --cluster ${ECS_CLUSTER} \
+                                        --service-name ${ECS_SERVICE} \
+                                        --task-definition ${TASK_DEFINITION_ARN} \
+                                        --desired-count 1 \
+                                        --launch-type FARGATE \
+                                        --network-configuration "awsvpcConfiguration={subnets=[${SUBNET_IDS}],securityGroups=[${SECURITY_GROUP_IDS}],assignPublicIp=ENABLED}" \
+                                        --region ${AWS_REGION}
+                                """
+                            }
+                        } catch (Exception e) {
+                            error "Failed to check or create ECS service: ${e}"
+                        }
                     }
                 }
             }
@@ -334,14 +517,42 @@ pipeline {
                     secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
                 )]) {
                     script {
-                        sh '''
-                            aws ecs update-service \
-                                --cluster ${ECS_CLUSTER} \
-                                --service ${ECS_SERVICE} \
-                                --task-definition ${TASK_DEFINITION_ARN} \
-                                --force-new-deployment \
-                                --region ${AWS_REGION}
-                        '''
+                        try {
+                            sh """
+                                aws ecs update-service \
+                                    --cluster ${ECS_CLUSTER} \
+                                    --service ${ECS_SERVICE} \
+                                    --task-definition ${TASK_DEFINITION_ARN} \
+                                    --force-new-deployment \
+                                    --region ${AWS_REGION}
+                            """
+                        } catch (Exception e) {
+                            error "Failed to deploy to ECS: ${e}"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Wait for Service Stability') {
+            steps {
+                withCredentials([aws(
+                    credentialsId: 'aws-cred',
+                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                )]) {
+                    script {
+                        try {
+                            sh '''
+                                aws ecs wait services-stable \
+                                    --cluster ${ECS_CLUSTER} \
+                                    --services ${ECS_SERVICE} \
+                                    --region ${AWS_REGION}
+                            '''
+                            echo "Service ${ECS_SERVICE} is stable."
+                        } catch (Exception e) {
+                            error "Service failed to stabilize: ${e}"
+                        }
                     }
                 }
             }
