@@ -84,16 +84,18 @@ pipeline {
             steps {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                     script {
+                        def firstSubnet = env.SUBNET_IDS.split(',')[0]
                         env.VPC_ID = sh(
                             script: """
-                                aws ec2 describe-vpcs \
+                                aws ec2 describe-subnets \
+                                    --subnet-ids ${firstSubnet} \
                                     --region ${AWS_REGION} \
-                                    --query 'Vpcs[0].VpcId' \
+                                    --query 'Subnets[0].VpcId' \
                                     --output text
                             """,
                             returnStdout: true
                         ).trim()
-                        echo "✅ Retrieved VPC ID: ${env.VPC_ID}"
+                        echo "✅ Resolved VPC ID from subnet: ${env.VPC_ID}"
                     }
                 }
             }
