@@ -534,29 +534,57 @@ pipeline {
             }
         }
 
-        stage('Wait for Service Stability') {
+        // stage('Wait for Service Stability') {
+        //     steps {
+        //         withCredentials([aws(
+        //             credentialsId: 'aws-cred',
+        //             accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+        //             secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+        //         )]) {
+        //             script {
+        //                 try {
+        //                     sh '''
+        //                         aws ecs wait services-stable \
+        //                             --cluster ${ECS_CLUSTER} \
+        //                             --services ${ECS_SERVICE} \
+        //                             --region ${AWS_REGION}
+        //                     '''
+        //                     echo "Service ${ECS_SERVICE} is stable."
+        //                 } catch (Exception e) {
+        //                     error "Service failed to stabilize: ${e}"
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
+    
+        stage('Wait for ECS Service Stability (Custom Wait)') {
             steps {
-                withCredentials([aws(
-                    credentialsId: 'aws-cred',
-                    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
-                    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
-                )]) {
-                    script {
-                        try {
-                            sh '''
-                                aws ecs wait services-stable \
-                                    --cluster ${ECS_CLUSTER} \
-                                    --services ${ECS_SERVICE} \
-                                    --region ${AWS_REGION}
-                            '''
-                            echo "Service ${ECS_SERVICE} is stable."
-                        } catch (Exception e) {
-                            error "Service failed to stabilize: ${e}"
+                script {
+                    def maxAttempts = 30  // ~15 min if sleep 30s
+                    def delay = 30
+                    for (int i = 0; i < maxAttempts; i++) {
+                        def output = sh(
+                            script: "aws ecs describe-services --cluster ${ECS_CLUSTER} --services ${ECS_SERVICE} --region ${AWS_REGION} --query 'services[0].deployments'",
+                            returnStdout: true
+                        ).trim()
+
+                        if (output.contains('"rolloutState": "COMPLETED"') && output.contains('"status": "PRIMARY"')) {
+                            echo "Service ${ECS_SERVICE} has stabilized."
+                            break
+                        } else {
+                            echo "Service ${ECS_SERVICE} not stable yet. Attempt ${i + 1}/${maxAttempts}. Waiting ${delay}s..."
+                            sleep delay
+                        }
+
+                        if (i == maxAttempts - 1) {
+                            error("Service did not stabilize within ${maxAttempts * delay / 60} minutes.")
                         }
                     }
                 }
             }
         }
+
     }
 
     post {
