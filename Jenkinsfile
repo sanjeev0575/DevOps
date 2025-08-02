@@ -14,8 +14,8 @@ pipeline {
         CONTAINER_NAME       = 'my-app-container'
         SUBNET_IDS           = 'subnet-01d7c4a4a6f9235e6,subnet-01c1ca97fe8b13fb1'
         SECURITY_GROUP_IDS   = 'sg-0644fd647017edcbf'
-        LOAD_BALANCER_NAME = "automated-flask-alb-${BUILD_NUMBER}"
-        TARGET_GROUP_NAME  = "flask-tg-${BUILD_NUMBER}"
+        LOAD_BALANCER_NAME   = "automated-flask-alb-${BUILD_NUMBER}"
+        TARGET_GROUP_NAME    = "flask-tg-${BUILD_NUMBER}"
         LISTENER_PORT        = '80'
     }
 
@@ -125,7 +125,7 @@ pipeline {
                             TG_ARN=$(aws elbv2 describe-target-groups --names ${TARGET_GROUP_NAME} --region ${AWS_REGION} --query 'TargetGroups[0].TargetGroupArn' --output text 2>/dev/null || echo "")
 
                             if [ -z "$TG_ARN" ]; then
-                                echo "🔧 Creating Target Group..."
+                                echo "🔧 Creating Target Group with /health path..."
                                 TG_ARN=$(aws elbv2 create-target-group \
                                     --name ${TARGET_GROUP_NAME} \
                                     --protocol HTTP \
@@ -133,6 +133,13 @@ pipeline {
                                     --target-type ip \
                                     --vpc-id ${VPC_ID} \
                                     --region ${AWS_REGION} \
+                                    --health-check-protocol HTTP \
+                                    --health-check-path /health \
+                                    --health-check-port traffic-port \
+                                    --health-check-interval-seconds 30 \
+                                    --health-check-timeout-seconds 5 \
+                                    --healthy-threshold-count 2 \
+                                    --unhealthy-threshold-count 2 \
                                     --query 'TargetGroups[0].TargetGroupArn' --output text)
                             fi
 
@@ -140,7 +147,7 @@ pipeline {
                             LISTENER_ARN=$(aws elbv2 describe-listeners \
                                 --load-balancer-arn $LB_ARN \
                                 --region ${AWS_REGION} \
-                                --query 'Listeners[?Port==\\`${LISTENER_PORT}\\`].ListenerArn' \
+                                --query 'Listeners[?Port==\`${LISTENER_PORT}\`].ListenerArn' \
                                 --output text 2>/dev/null || echo "")
 
                             if [ -z "$LISTENER_ARN" ]; then
@@ -152,7 +159,6 @@ pipeline {
                                     --region ${AWS_REGION}
                             fi
 
-                            # Fail early if TG_ARN is still empty
                             if [ -z "$TG_ARN" ]; then
                                 echo "❌ TG_ARN is empty. Cannot continue."
                                 exit 1
@@ -161,7 +167,6 @@ pipeline {
                             echo "TG_ARN=$TG_ARN" >> env.properties
                         '''
 
-                        // Check file exists before reading
                         if (!fileExists('env.properties')) {
                             error("❌ env.properties file not found! Likely failure in LB or TG creation.")
                         }
@@ -173,7 +178,6 @@ pipeline {
                 }
             }
         }
-
 
         stage('Check or Create ECS Service') {
             steps {
