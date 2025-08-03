@@ -178,21 +178,57 @@ pipeline {
                 }
             }
         }
-        stage('Check Target Group Health') {
-            steps {
-                withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                sh '''
+    //     stage('Check Target Group Health') {
+    //         steps {
+    //             withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+    //             sh '''
                     
+    //                 aws elbv2 describe-target-health \
+    //                     --target-group-arn ${TG_ARN} \
+    //                     --region ${AWS_REGION} \
+    //                     --output table
+    //                 echo "Target Group ARN: ${TG_ARN}"
+    //                 echo "AWS Region: ${AWS_REGION}"
+    //             '''
+    //             }
+    //         }
+    // }
+    stage('Debug Target Registration') {
+        steps {
+            withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                sh '''
+                    echo "🔍 ECS Task ENIs & IPs:"
+                    TASK_ARN=$(aws ecs list-tasks \
+                    --cluster ${ECS_CLUSTER} \
+                    --service-name ${ECS_SERVICE} \
+                    --region ${AWS_REGION} \
+                    --query 'taskArns[0]' --output text)
+
+                    ENI_ID=$(aws ecs describe-tasks \
+                    --cluster ${ECS_CLUSTER} \
+                    --tasks $TASK_ARN \
+                    --region ${AWS_REGION} \
+                    --query 'tasks[0].attachments[0].details[?name==`networkInterfaceId`].value' \
+                    --output text)
+
+                    PRIVATE_IP=$(aws ec2 describe-network-interfaces \
+                    --network-interface-ids $ENI_ID \
+                    --region ${AWS_REGION} \
+                    --query 'NetworkInterfaces[0].PrivateIpAddress' --output text)
+
+                    echo "🧠 Task ENI: $ENI_ID"
+                    echo "🌐 Private IP: $PRIVATE_IP"
+
+                    echo "🔍 Target Health Check:"
                     aws elbv2 describe-target-health \
-                        --target-group-arn ${TG_ARN} \
-                        --region ${AWS_REGION} \
-                        --output table
-                    echo "Target Group ARN: ${TG_ARN}"
-                    echo "AWS Region: ${AWS_REGION}"
+                    --target-group-arn ${TG_ARN} \
+                    --region ${AWS_REGION} \
+                    --output table
                 '''
-                }
             }
-    }
+        }
+}
+
 
 
         stage('Check or Create ECS Service') {
