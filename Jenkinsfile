@@ -11,11 +11,11 @@ pipeline {
         TASK_FAMILY          = 'python-app-task-automated'
         TASK_DEFINITION_NAME = "automated-deploy-task-${BUILD_NUMBER}"
         CONTAINER_NAME       = 'my-app-container'
-        SUBNET_IDS           = 'subnet-01d7c4a4a6f9235e6,subnet-01c1ca97fe8b13fb1'
+        SUBNET_IDS           = ('subnet-01d7c4a4a6f9235e6,subnet-01c1ca97fe8b13fb1')
         SECURITY_GROUP_IDS   = 'sg-0c57473a6ece357b0'
         LOAD_BALANCER_NAME   = "automated-flask-alb-${BUILD_NUMBER}"
         TARGET_GROUP_NAME    = "flask-tg-${BUILD_NUMBER}"
-        LISTENER_PORT        = '80'
+        LISTENER_PORT        = '5000'
     }
 
     stages {
@@ -178,21 +178,21 @@ pipeline {
                 }
             }
         }
-    //     stage('Check Target Group Health') {
-    //         steps {
-    //             withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-    //             sh '''
+        stage('Check Target Group Health') {
+            steps {
+                withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                sh '''
                     
-    //                 aws elbv2 describe-target-health \
-    //                     --target-group-arn ${TG_ARN} \
-    //                     --region ${AWS_REGION} \
-    //                     --output table
-    //                 echo "Target Group ARN: ${TG_ARN}"
-    //                 echo "AWS Region: ${AWS_REGION}"
-    //             '''
-    //             }
-    //         }
-    // }
+                    aws elbv2 describe-target-health \
+                        --target-group-arn ${TG_ARN} \
+                        --region ${AWS_REGION} \
+                        --output table
+                    echo "Target Group ARN: ${TG_ARN}"
+                    echo "AWS Region: ${AWS_REGION}"
+                '''
+                }
+            }
+    }
     stage('Debug ECS Task IP Registration') {
     steps {
         withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
