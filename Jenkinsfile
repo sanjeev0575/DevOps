@@ -183,15 +183,15 @@ pipeline {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                 sh '''
                     echo "🔍 Checking registered targets:"
-                    // aws elbv2 describe-target-health \
-                    // --target-group-arn ${TG_ARN} \
-                    // --region ${AWS_REGION} \
-                    // --output table
                     aws elbv2 describe-target-health \
-                        --target-group-arn ${TG_ARN} \
-                        --region ${AWS_REGION} \
-                        --query 'TargetHealthDescriptions[*].{Target:Target, State:TargetHealth.State, Reason:TargetHealth.Reason, Description:TargetHealth.Description}' \
-                        --output table
+                    --target-group-arn ${TG_ARN} \
+                    --region ${AWS_REGION} \
+                    --output table
+                    // aws elbv2 describe-target-health \
+                    //     --target-group-arn ${TG_ARN} \
+                    //     --region ${AWS_REGION} \
+                    //     --query 'TargetHealthDescriptions[*].{Target:Target, State:TargetHealth.State, Reason:TargetHealth.Reason, Description:TargetHealth.Description}' \
+                    //     --output table
 
                 '''
                 }
@@ -232,7 +232,7 @@ pipeline {
                                 aws ecs create-service \
                                     --cluster ${ECS_CLUSTER} \
                                     --service-name ${ECS_SERVICE} \
-                                    --task-definition ${TASK_DEF_ARN} \
+                                    --task-definition ${TASK_DEFINITION_ARN} \
                                     --launch-type FARGATE \
                                     --network-configuration 'awsvpcConfiguration={subnets=[${SUBNET_IDS}],securityGroups=[${SECURITY_GROUP_IDS}],assignPublicIp=ENABLED}' \
                                                                 
