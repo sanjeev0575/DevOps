@@ -100,6 +100,61 @@ pipeline {
             }
         }
 
+        stage('Create Target Group') {
+            steps {
+                withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                sh '''
+                echo "Creating target group..."
+                aws elbv2 create-target-group \
+                    --name ${TARGET_GROUP_NAME} \
+                    --protocol HTTP \
+                    --port 80 \
+                    --vpc-id ${VPC_ID} \
+                    --target-type ip \
+                    --region ${AWS_REGION} \
+                    --health-check-path / \
+                    --health-check-protocol HTTP \
+                    --query "TargetGroups[0].TargetGroupArn" --output text
+                '''
+                }
+            }
+        }
+        stage('Register ECS Task to Target Group') {
+            steps {
+                withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                sh '''
+                echo "Getting ECS task ARN..."
+                TASK_ARN=$(aws ecs list-tasks \
+                    --cluster ${ECS_CLUSTER} \
+                    --service-name ${ECS_SERVICE} \
+                    --region ${AWS_REGION} \
+                    --query "taskArns[0]" --output text)
+
+                echo "Getting task ENI IP..."
+                ENI_ID=$(aws ecs describe-tasks \
+                    --cluster ${ECS_CLUSTER} \
+                    --tasks $TASK_ARN \
+                    --region ${AWS_REGION} \
+                    --query "tasks[0].attachments[0].details[?name=='networkInterfaceId'].value" \
+                    --output text)
+
+                PRIVATE_IP=$(aws ec2 describe-network-interfaces \
+                    --network-interface-ids $ENI_ID \
+                    --region ${AWS_REGION} \
+                    --query "NetworkInterfaces[0].PrivateIpAddress" \
+                    --output text)
+
+                echo "Registering IP: $PRIVATE_IP to target group..."
+                aws elbv2 register-targets \
+                    --target-group-arn ${TG_ARN} \
+                    --targets Id=$PRIVATE_IP,Port=5000 \
+                    --region ${AWS_REGION}
+                '''
+                }
+            }
+        }
+
+
         stage('Create Load Balancer & Target Group') {
             steps {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
@@ -206,7 +261,7 @@ pipeline {
                     aws elbv2 describe-target-health \
                         --target-group-arn ${TG_ARN} \
                         --region ${AWS_REGION} \
-                        --output table
+                        --output table || echo "Error: Failed to describe target health"
                     echo "Target Group ARN: ${TG_ARN}"
                     echo "AWS Region: ${AWS_REGION}"
                 '''
