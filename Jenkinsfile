@@ -208,16 +208,14 @@ pipeline {
                     --cluster ${ECS_CLUSTER} \
                     --tasks $TASK_ARN \
                     --region ${AWS_REGION} \
-                    --query 'tasks[0].attachments[0].details[?name==`networkInterfaceId`].value' \
+                    --query 'tasks[0].containers[0].lastStatus \
                     --output text)
 
-                    PRIVATE_IP=$(aws ec2 describe-network-interfaces \
-                    --network-interface-ids $ENI_ID \
-                    --region ${AWS_REGION} \
-                    --query 'NetworkInterfaces[0].PrivateIpAddress' --output text)
-
-                    echo "🧠 Task ENI: $ENI_ID"
-                    echo "🌐 Private IP: $PRIVATE_IP"
+                    aws ecs describe-tasks \
+                        --cluster ${ECS_CLUSTER} \
+                        --tasks $TASK_ARN \
+                        --region ${AWS_REGION} \
+                        --query 'tasks[0].attachments[0].details'
 
                     echo "🔍 Target Health Check:"
                     aws elbv2 describe-target-health \
