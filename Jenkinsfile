@@ -183,10 +183,9 @@ pipeline {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                 sh '''
                     aws elbv2 describe-target-health \
-                        --target-group-arn ${TG_ARN} \
-                        --region ${AWS_REGION} \
-                        --query 'TargetHealthDescriptions[*].{Target:Target, State:TargetHealth.State, Reason:TargetHealth.Reason, Description:TargetHealth.Description}' \
-                        --output table
+                    // --target-group-arn ${TG_ARN} \
+                    // --region ${AWS_REGION} \
+                    // --output table
 
                 '''
                 }
@@ -215,15 +214,6 @@ pipeline {
                         } else {
                             echo "Creating ECS service..."
                             sh """
-                                // aws ecs create-service \
-                                //     --cluster ${ECS_CLUSTER} \
-                                //     --service-name ${ECS_SERVICE} \
-                                //     --task-definition ${TASK_DEFINITION_ARN} \
-                                //     --desired-count 1 \
-                                //     --launch-type FARGATE \
-                                //     --network-configuration \"awsvpcConfiguration={subnets=[${SUBNET_IDS}],securityGroups=[${SECURITY_GROUP_IDS}],assignPublicIp=ENABLED}\" \
-                                //     --load-balancers \"targetGroupArn=${TG_ARN},containerName=${CONTAINER_NAME},containerPort=5000\" \
-                                //     --region ${AWS_REGION}
                                 aws ecs create-service \
                                     --cluster ${ECS_CLUSTER} \
                                     --service-name ${ECS_SERVICE} \
@@ -231,13 +221,13 @@ pipeline {
                                     --launch-type FARGATE \
                                     --network-configuration 'awsvpcConfiguration={subnets=[${SUBNET_IDS}],securityGroups=[${SECURITY_GROUP_IDS}],assignPublicIp=ENABLED}' \
                                                                 
-                                    --load-balancers '[
+                                    "loadBalancers":[
                                         {
                                         "targetGroupArn": "${TG_ARN}",
                                         "containerName": "${CONTAINER_NAME}",
                                         "containerPort": 5000
                                         }
-                                    ]' \
+                                    ] \
                                     --region ${AWS_REGION}
                             """
                         }
