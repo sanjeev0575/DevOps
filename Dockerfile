@@ -22,4 +22,6 @@ COPY . .
 EXPOSE 5000
 
 # Start the Flask app with Gunicorn and enable logging to stdout
+#CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "--access-logfile", "-", "--error-logfile", "-", "app:app"]
 CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "--access-logfile", "-", "--error-logfile", "-", "app:app"]
+
