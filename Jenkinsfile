@@ -182,6 +182,26 @@ pipeline {
             steps {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                 sh '''
+                echo "🔍 Listing ECS task..."
+                TASK_ARN=$(aws ecs list-tasks \
+                  --cluster ${ECS_CLUSTER} \
+                  --service-name ${ECS_SERVICE} \
+                  --region ${AWS_REGION} \
+                  --query "taskArns[0]" --output text)
+
+                echo "📦 Describing task: $TASK_ARN"
+                aws ecs describe-tasks \
+                    --cluster ${ECS_CLUSTER} \
+                    --tasks $TASK_ARN \
+                    --region ${AWS_REGION} \
+                    --query "tasks[0].containers[0].lastStatus"
+
+                echo "📦 Checking network attachment"
+                    aws ecs describe-tasks \
+                    --cluster ${ECS_CLUSTER} \
+                    --tasks $TASK_ARN \
+                    --region ${AWS_REGION} \
+                    --query "tasks[0].attachments[0].details"
                     
                     aws elbv2 describe-target-health \
                         --target-group-arn ${TG_ARN} \
