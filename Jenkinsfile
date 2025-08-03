@@ -222,14 +222,7 @@ pipeline {
                                     --task-definition ${TASK_DEFINITION_ARN} \
                                     --launch-type FARGATE \
                                     --network-configuration 'awsvpcConfiguration={subnets=[${SUBNET_IDS}],securityGroups=[${SECURITY_GROUP_IDS}],assignPublicIp=ENABLED}' \
-                                                                
-                                    "loadBalancers":[
-                                        {
-                                        "targetGroupArn": "${TG_ARN}",
-                                        "containerName": "${CONTAINER_NAME}",
-                                        "containerPort": 5000
-                                        }
-                                    ] \
+                                    --load-balancers '[{"targetGroupArn":"${TG_ARN}","containerName":"${CONTAINER_NAME}","containerPort":5000}]' \
                                     --region ${AWS_REGION}
                             """
                         }
