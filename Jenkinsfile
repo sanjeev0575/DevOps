@@ -182,16 +182,16 @@ pipeline {
             steps {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                 sh '''
-                    echo "🔍 Checking registered targets:"
-                    aws elbv2 describe-target-health \
-                    --target-group-arn ${TG_ARN} \
-                    --region ${AWS_REGION} \
-                    --output table
+                    // echo "🔍 Checking registered targets:"
                     // aws elbv2 describe-target-health \
-                    //     --target-group-arn ${TG_ARN} \
-                    //     --region ${AWS_REGION} \
-                    //     --query 'TargetHealthDescriptions[*].{Target:Target, State:TargetHealth.State, Reason:TargetHealth.Reason, Description:TargetHealth.Description}' \
-                    //     --output table
+                    // --target-group-arn ${TG_ARN} \
+                    // --region ${AWS_REGION} \
+                    // --output table
+                    aws elbv2 describe-target-health \
+                        --target-group-arn ${TG_ARN} \
+                        --region ${AWS_REGION} \
+                        --query 'TargetHealthDescriptions[*].{Target:Target, State:TargetHealth.State, Reason:TargetHealth.Reason, Description:TargetHealth.Description}' \
+                        --output table
 
                 '''
                 }
