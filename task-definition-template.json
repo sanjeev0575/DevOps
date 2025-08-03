@@ -8,7 +8,7 @@
   "containerDefinitions": [
     {
       "name": "${CONTAINER_NAME}",
-      "image": "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}",
+      "image": "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG",
       "portMappings": [
         {
           "containerPort": 5000,
