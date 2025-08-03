@@ -12,7 +12,6 @@
       "portMappings": [
         {
           "containerPort": 5000,
-          "hostPort": 5000,
           "protocol": "tcp"
         }
       ],
@@ -30,7 +29,7 @@
         "interval": 30,
         "timeout": 5,
         "retries": 3,
-        "startPeriod": 10
+        "startPeriod": 30
       }
     }
   ]
