@@ -254,13 +254,13 @@ pipeline {
                         def listenerArn = sh(
                             script: """
                                 aws elbv2 describe-listeners \
-                                    --load-balancer-arn $(aws elbv2 describe-load-balancers \
-                                        --names ${LOAD_BALANCER_NAME} \
-                                        --region ${AWS_REGION} \
+                                    --load-balancer-arn \$(aws elbv2 describe-load-balancers \
+                                        --names \${LOAD_BALANCER_NAME} \
+                                        --region \${AWS_REGION} \
                                         --query 'LoadBalancers[0].LoadBalancerArn' \
                                         --output text) \
-                                    --query 'Listeners[?Port==\`${LISTENER_PORT}\`].ListenerArn' \
-                                    --region ${AWS_REGION} \
+                                    --query 'Listeners[?Port==\\\`${LISTENER_PORT}\\`].ListenerArn' \
+                                    --region \${AWS_REGION} \
                                     --output text
                             """,
                             returnStdout: true
