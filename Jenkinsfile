@@ -259,7 +259,7 @@ pipeline {
                                         --region \${AWS_REGION} \
                                         --query 'LoadBalancers[0].LoadBalancerArn' \
                                         --output text) \
-                                    --query 'Listeners[?Port==\\\`${LISTENER_PORT}\\`].ListenerArn' \
+                                    --query 'Listeners[?Port==`'"${LISTENER_PORT}"'`].ListenerArn'  \
                                     --region \${AWS_REGION} \
                                     --output text
                             """,
