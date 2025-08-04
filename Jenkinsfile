@@ -574,7 +574,7 @@ pipeline {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                     script {
                         def listenerArn = sh(
-                            script: """
+                            script: '''
                                 aws elbv2 describe-listeners \
                                     --load-balancer-arn $(aws elbv2 describe-load-balancers \
                                         --names ${LOAD_BALANCER_NAME} \
@@ -584,13 +584,13 @@ pipeline {
                                     --query 'Listeners[?Port==`${LISTENER_PORT}`].ListenerArn' \
                                     --region ${AWS_REGION} \
                                     --output text
-                            """,
+                            ''',
                             returnStdout: true
                         ).trim()
 
                         if (!listenerArn || listenerArn == "None" || listenerArn == "") {
                             listenerArn = sh(
-                                script: """
+                                script: '''
                                     aws elbv2 create-listener \
                                         --load-balancer-arn $(aws elbv2 describe-load-balancers \
                                             --names ${LOAD_BALANCER_NAME} \
@@ -603,16 +603,16 @@ pipeline {
                                         --region ${AWS_REGION} \
                                         --query 'Listeners[0].ListenerArn' \
                                         --output text
-                                """,
+                                ''',
                                 returnStdout: true
                             ).trim()
                         } else {
-                            sh """
+                            sh '''
                                 aws elbv2 modify-listener \
                                     --listener-arn ${listenerArn} \
                                     --default-actions Type=forward,TargetGroupArn=${TG_ARN} \
                                     --region ${AWS_REGION}
-                            """
+                            '''
                         }
 
                         env.LISTENER_ARN = listenerArn
