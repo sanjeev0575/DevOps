@@ -140,30 +140,33 @@ pipeline {
         stage('Check or Create ECS Service') {
             steps {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                    script {
-                        sh '''#!/bin/bash
-                        STATUS=$(aws ecs describe-services \
+                    sh '''
+                        SERVICE_EXISTS=$(aws ecs describe-services \
                             --cluster ${ECS_CLUSTER} \
                             --services ${ECS_SERVICE} \
                             --region ${AWS_REGION} \
-                            --query 'services[0].status' --output text 2>/dev/null || echo "MISSING")
+                            --query "services[?status=='ACTIVE'].serviceName" \
+                            --output text)
 
-                        if [ "$STATUS" = "MISSING" ] || [ "$STATUS" = "INACTIVE" ]; then
+                        if [ -z "$SERVICE_EXISTS" ]; then
+                            echo "ECS service does not exist. Creating..."
                             aws ecs create-service \
                                 --cluster ${ECS_CLUSTER} \
                                 --service-name ${ECS_SERVICE} \
                                 --task-definition ${TASK_DEFINITION_ARN} \
-                                --desired-count 1 \
                                 --launch-type FARGATE \
-                                --network-configuration "awsvpcConfiguration={subnets=[${SUBNET_IDS}],securityGroups=[${SECURITY_GROUP_IDS}],assignPublicIp=ENABLED}" \
-                                --load-balancers "targetGroupArn=${TG_ARN},containerName=${CONTAINER_NAME},containerPort=5000" \
+                                --network-configuration "awsvpcConfiguration={subnets=[${SUBNET_ID}],securityGroups=[${SECURITY_GROUP_ID}],assignPublicIp=ENABLED}" \
+                                --load-balancers "targetGroupArn=${TARGET_GROUP_ARN},containerName=python-app,containerPort=5000" \
+                                --desired-count 1 \
                                 --region ${AWS_REGION}
+                        else
+                            echo "ECS service exists. Skipping creation."
                         fi
-                        '''
-                    }
+                    '''
                 }
             }
         }
+
 
         stage('Deploy to ECS') {
             steps {
@@ -179,6 +182,7 @@ pipeline {
                 }
             }
         }
+
 
 
 
