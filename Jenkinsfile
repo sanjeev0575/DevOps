@@ -102,9 +102,15 @@ pipeline {
         stage('Register ECS Task to Target Group') {
             steps {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                    sh '''#!/bin/bash
+                   sh '''#!/bin/bash
                         echo "📥 Loading TG_ARN from env.properties..."
                         source env.properties
+
+                        echo "✔ TG_ARN loaded: $TG_ARN"
+                        if [ -z "$TG_ARN" ]; then
+                        echo "❌ Error: TG_ARN is empty"
+                        exit 1
+                        fi
 
                         echo "🕒 Waiting for ECS task to be running..."
                         sleep 30
@@ -116,8 +122,8 @@ pipeline {
                             --region ${AWS_REGION} \
                             --query "taskArns[0]" --output text)
 
-                        if [ -z "$TASK_ARN" ]; then
-                            echo "❌ Error: No ECS task found."
+                        if [[ "$TASK_ARN" == "None" || -z "$TASK_ARN" || "$TASK_ARN" == "null" ]]; then
+                            echo "❌ Error: No ECS task found or task ARN is invalid."
                             exit 1
                         fi
 
@@ -144,87 +150,7 @@ pipeline {
 
                         echo "✅ Registered IP: $PRIVATE_IP on port 5000"
                     '''
-                }
-            }
-        }
 
-
-
-        stage('Create Load Balancer & Target Group') {
-            steps {
-                withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                    script {
-                        sh '''#!/bin/bash
-                            set -e
-                            echo "🔍 Checking if Load Balancer exists..."
-                            LB_ARN=$(aws elbv2 describe-load-balancers --names ${LOAD_BALANCER_NAME} --region ${AWS_REGION} --query 'LoadBalancers[0].LoadBalancerArn' --output text 2>/dev/null || echo "")
-
-                            if [ -z "$LB_ARN" ]; then
-                                echo "🔧 Creating Load Balancer..."
-                                LB_ARN=$(aws elbv2 create-load-balancer \
-                                    --name ${LOAD_BALANCER_NAME} \
-                                    --subnets $(echo ${SUBNET_IDS} | tr ',' ' ') \
-                                    --security-groups ${SECURITY_GROUP_IDS} \
-                                    --scheme internet-facing \
-                                    --type application \
-                                    --region ${AWS_REGION} \
-                                    --query 'LoadBalancers[0].LoadBalancerArn' --output text)
-                            fi
-
-                            echo "🔍 Checking if Target Group exists..."
-                            TG_ARN=$(aws elbv2 describe-target-groups --names ${TARGET_GROUP_NAME} --region ${AWS_REGION} --query 'TargetGroups[0].TargetGroupArn' --output text 2>/dev/null || echo "")
-
-                            if [ -z "$TG_ARN" ]; then
-                                echo "🔧 Creating Target Group with /health path..."
-                                TG_ARN=$(aws elbv2 create-target-group \
-                                    --name ${TARGET_GROUP_NAME} \
-                                    --protocol HTTP \
-                                    --port 5000 \
-                                    --target-type ip \
-                                    --vpc-id ${VPC_ID} \
-                                    --region ${AWS_REGION} \
-                                    --health-check-protocol HTTP \
-                                    --health-check-path /health \
-                                    --health-check-port traffic-port \
-                                    --health-check-interval-seconds 30 \
-                                    --health-check-timeout-seconds 5 \
-                                    --healthy-threshold-count 2 \
-                                    --unhealthy-threshold-count 2 \
-                                    --query 'TargetGroups[0].TargetGroupArn' --output text)
-                            fi
-
-                            echo "🔍 Checking if Listener exists..."
-                            LISTENER_ARN=$(aws elbv2 describe-listeners \
-                                --load-balancer-arn $LB_ARN \
-                                --region ${AWS_REGION} \
-                                --query 'Listeners[?Port==`'"${LISTENER_PORT}"'`].ListenerArn' \
-                                --output text 2>/dev/null || echo "")
-
-                            if [ -z "$LISTENER_ARN" ]; then
-                                echo "🔧 Creating Listener on port ${LISTENER_PORT}..."
-                                aws elbv2 create-listener \
-                                    --load-balancer-arn $LB_ARN \
-                                    --protocol HTTP \
-                                    --port ${LISTENER_PORT} \
-                                    --default-actions Type=forward,TargetGroupArn=$TG_ARN \
-                                    --region ${AWS_REGION}
-                            fi
-
-                            if [ -z "$TG_ARN" ]; then
-                                echo "❌ TG_ARN is empty. Cannot continue."
-                                exit 1
-                            fi
-
-                            echo "TG_ARN=$TG_ARN" > env.properties
-                        '''
-
-                        if (!fileExists('env.properties')) {
-                            error("❌ env.properties file not found! Likely failure in LB or TG creation.")
-                        }
-
-                        def props = readProperties file: 'env.properties'
-                        env.TG_ARN = props.TG_ARN
-                        echo "✔️ TG_ARN read from env.properties: ${env.TG_ARN}"
                     }
                 }
             }
