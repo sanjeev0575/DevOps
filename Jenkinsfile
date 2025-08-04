@@ -1,5 +1,6 @@
 pipeline {
     agent any
+
     environment {
         AWS_REGION           = 'us-east-1'
         AWS_ACCOUNT_ID       = '115456585578'
@@ -99,63 +100,6 @@ pipeline {
                 }
             }
         }
-        stage('Register ECS Task to Target Group') {
-            steps {
-                withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                   sh '''#!/bin/bash
-                        echo "📥 Loading TG_ARN from env.properties..."
-                        source env.properties
-
-                        echo "✔ TG_ARN loaded: $TG_ARN"
-                        if [ -z "$TG_ARN" ]; then
-                        echo "❌ Error: TG_ARN is empty"
-                        exit 1
-                        fi
-
-                        echo "🕒 Waiting for ECS task to be running..."
-                        sleep 30
-
-                        echo "🔍 Getting ECS task ARN..."
-                        TASK_ARN=$(aws ecs list-tasks \
-                            --cluster ${ECS_CLUSTER} \
-                            --service-name ${ECS_SERVICE} \
-                            --region ${AWS_REGION} \
-                            --query "taskArns[0]" --output text)
-
-                        if [[ "$TASK_ARN" == "None" || -z "$TASK_ARN" || "$TASK_ARN" == "null" ]]; then
-                            echo "❌ Error: No ECS task found or task ARN is invalid."
-                            exit 1
-                        fi
-
-                        echo "🔎 Getting ENI ID from task..."
-                        ENI_ID=$(aws ecs describe-tasks \
-                            --cluster ${ECS_CLUSTER} \
-                            --tasks $TASK_ARN \
-                            --region ${AWS_REGION} \
-                            --query "tasks[0].attachments[0].details[?name=='networkInterfaceId'].value" \
-                            --output text)
-
-                        echo "📡 Getting private IP from ENI..."
-                        PRIVATE_IP=$(aws ec2 describe-network-interfaces \
-                            --network-interface-ids $ENI_ID \
-                            --region ${AWS_REGION} \
-                            --query "NetworkInterfaces[0].PrivateIpAddress" \
-                            --output text)
-
-                        echo "📍 Registering IP $PRIVATE_IP to target group $TG_ARN..."
-                        aws elbv2 register-targets \
-                            --target-group-arn $TG_ARN \
-                            --targets Id=$PRIVATE_IP,Port=5000 \
-                            --region ${AWS_REGION}
-
-                        echo "✅ Registered IP: $PRIVATE_IP on port 5000"
-                    '''
-
-                    }
-                }
-            }
-        }
-
 
         stage('Check or Create ECS Service') {
             steps {
@@ -263,6 +207,4 @@ pipeline {
             echo '❌ Deployment failed. Check ECS events and CloudWatch logs.'
         }
     }
-
-
-
+}
