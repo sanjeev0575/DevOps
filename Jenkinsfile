@@ -247,6 +247,44 @@ pipeline {
             }
         }
 
+        stage('Attach Target Group to Listener') {
+            steps {
+                withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                    script {
+                        def listenerArn = sh(
+                            script: """
+                                aws elbv2 describe-listeners \
+                                    --load-balancer-arn $(aws elbv2 describe-load-balancers \
+                                        --names ${LOAD_BALANCER_NAME} \
+                                        --region ${AWS_REGION} \
+                                        --query 'LoadBalancers[0].LoadBalancerArn' \
+                                        --output text) \
+                                    --query 'Listeners[?Port==\`${LISTENER_PORT}\`].ListenerArn' \
+                                    --region ${AWS_REGION} \
+                                    --output text
+                            """,
+                            returnStdout: true
+                        ).trim()
+
+                        if (!listenerArn || listenerArn == "None") {
+                            error("❌ Listener not found on Load Balancer ${LOAD_BALANCER_NAME}")
+                        }
+
+                        env.LISTENER_ARN = listenerArn
+                        echo "✅ Listener ARN: ${LISTENER_ARN}"
+
+                        // Attach TG to LB Listener
+                        sh """
+                            echo '🔗 Attaching target group to listener...'
+                            aws elbv2 modify-listener \
+                                --listener-arn ${LISTENER_ARN} \
+                                --default-actions Type=forward,TargetGroupArn=${TG_ARN} \
+                                --region ${AWS_REGION}
+                        """
+                    }
+                }
+            }
+        }
 
 
         
