@@ -102,39 +102,39 @@ pipeline {
         }
 
         stage('Fetch Target Group ARN') {
-                steps {
-                    withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                        script {
-                            def tgArn = sh(
-                                script: """
-                                    aws elbv2 describe-target-groups \
+            steps {
+                withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                    script {
+                        def tgArn = sh(
+                            script: """
+                                aws elbv2 describe-target-groups \
                                         --names ${TARGET_GROUP_NAME} \
                                         --region ${AWS_REGION} \
                                         --query 'TargetGroups[0].TargetGroupArn' \
                                         --output text
                                 """,
-                                returnStdout: true
-                            ).trim()
+                            returnStdout: true
+                        ).trim()
 
-                            env.TG_ARN = tgArn
-                            echo "✅ Target Group ARN fetched: ${TG_ARN}"
-                        }
+                        env.TG_ARN = tgArn
+                        echo "✅ Target Group ARN fetched: ${TG_ARN}"
                     }
                 }
             }
-            stage('Check Target Group Health') {
-                steps {
-                    withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                        sh '''
+        }
+        stage('Check Target Group Health') {
+            steps {
+                withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                    sh '''
                             echo "📊 Checking target health..."
                             aws elbv2 describe-target-health \
                                 --target-group-arn ${TG_ARN} \
                                 --region ${AWS_REGION} \
                                 --output table
-                        '''
-                    }
+                    '''
                 }
             }
+        }
         
         stage('Check or Create ECS Service') {
             steps {
