@@ -174,8 +174,6 @@ pipeline {
             steps {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                 sh '''
-                    . alb_target_info.env
-
                     echo "🔍 Checking if Target Group exists..."
                     TG_ARN=$(aws elbv2 describe-target-groups \
                     --names ${TARGET_GROUP_NAME} \
