@@ -156,7 +156,7 @@ pipeline {
                                 --task-definition ${TASK_DEFINITION_ARN} \
                                 --launch-type FARGATE \
                                 --network-configuration "awsvpcConfiguration={subnets=[${SUBNET_ID}],securityGroups=[${SECURITY_GROUP_ID}],assignPublicIp=ENABLED}" \
-                                --load-balancers "targetGroupArn=${TARGET_GROUP_ARN},containerName=${CONTAINER_NAME},containerPort=5000" \
+                                --load-balancers "targetGroupArn=${TG_ARN},containerName=${CONTAINER_NAME},containerPort=5000" \
                                 --desired-count 1 \
                                 --region ${AWS_REGION}
                         else
