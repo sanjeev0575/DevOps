@@ -17,6 +17,7 @@ pipeline {
         TARGET_GROUP_NAME    = "flask-tg-${BUILD_NUMBER}"
         LOAD_BALANCER_NAME   = "automated-flask-alb-${BUILD_NUMBER}"
         LISTENER_PORT        = '80'
+        CONTAINER_PORT       =  '5000'
     }
 
     stages {
