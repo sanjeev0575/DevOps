@@ -1,5 +1,5 @@
 {
-  "family": "${TASK_FAMILY}",
+  "family": "${TASK_DEFINITION_NAME}", 
   "networkMode": "awsvpc",
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "512",
