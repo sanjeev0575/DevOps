@@ -403,7 +403,7 @@ pipeline {
         ECS_CLUSTER          = 'my-ecs-cluster-automated-deploy'
         ECS_SERVICE          = 'my-ecs-service-automated-deploy'
         TASK_FAMILY          = 'python-app-task-automated'
-        TASK_DEFINITION_NAME = "automated-deploy-task-${BUILD_NUMBER}"
+        TASK_DEFINITION_ARN = "automated-deploy-task-${BUILD_NUMBER}"
         CONTAINER_NAME       = 'my-app-container'
         SUBNET_IDS           = 'subnet-01d7c4a4a6f9235e6,subnet-01c1ca97fe8b13fb1'
         SECURITY_GROUP_IDS   = 'sg-06038dcb5d09203b0'
