@@ -753,8 +753,8 @@ pipeline {
         // }
 
         stage('Final Target Group Health Check') {
-            withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                steps {
+            steps {
+                withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                     sh '''
                         echo "📊 Checking final target health..."
                         aws elbv2 describe-target-health \
