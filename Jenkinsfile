@@ -171,41 +171,82 @@ pipeline {
             }
         }
 
+        // stage('Check or Create Target Group') {
+        //     steps {
+        //         withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+        //         sh '''
+        //             echo "🔍 Checking if Target Group exists..."
+        //             TG_ARN=$(aws elbv2 describe-target-groups \
+        //             --names ${TARGET_GROUP_NAME} \
+        //             --region ${AWS_REGION} \
+        //             --query 'TargetGroups[0].TargetGroupArn' \
+        //             --output text 2>/dev/null || echo "")
+
+        //             if [ -z "$TG_ARN" ] || [[ "$TG_ARN" == "None" ]]; then
+        //             echo "🔧 Creating Target Group..."
+        //             TG_ARN=$(aws elbv2 create-target-group \
+        //                 --name ${TARGET_GROUP_NAME} \
+        //                 --protocol HTTP \
+        //                 --port ${CONTAINER_PORT} \
+        //                 --target-type ip \
+        //                 --vpc-id ${VPC_ID} \
+        //                 --health-check-path / \
+        //                 --region ${AWS_REGION} \
+        //                 --query 'TargetGroups[0].TargetGroupArn' \
+        //                 --output text)
+
+        //             echo "✅ Created Target Group: $TG_ARN"
+        //             else
+        //             echo "✅ Target Group already exists: $TG_ARN"
+        //             fi
+
+        //             echo "TG_ARN=$TG_ARN" > alb_target_info.env
+        //         '''
+        //         }
+        //     }
+        // }
         stage('Check or Create Target Group') {
             steps {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                sh '''
-                    echo "🔍 Checking if Target Group exists..."
-                    TG_ARN=$(aws elbv2 describe-target-groups \
-                    --names ${TARGET_GROUP_NAME} \
-                    --region ${AWS_REGION} \
-                    --query 'TargetGroups[0].TargetGroupArn' \
-                    --output text 2>/dev/null || echo "")
+                    script {
+                        def tgArn = sh(
+                            script: """
+                                aws elbv2 describe-target-groups \
+                                    --names ${TARGET_GROUP_NAME} \
+                                    --region ${AWS_REGION} \
+                                    --query 'TargetGroups[0].TargetGroupArn' \
+                                    --output text 2>/dev/null || echo ""
+                            """,
+                            returnStdout: true
+                        ).trim()
 
-                    if [ -z "$TG_ARN" ] || [[ "$TG_ARN" == "None" ]]; then
-                    echo "🔧 Creating Target Group..."
-                    TG_ARN=$(aws elbv2 create-target-group \
-                        --name ${TARGET_GROUP_NAME} \
-                        --protocol HTTP \
-                        --port ${CONTAINER_PORT} \
-                        --target-type ip \
-                        --vpc-id ${VPC_ID} \
-                        --health-check-path / \
-                        --region ${AWS_REGION} \
-                        --query 'TargetGroups[0].TargetGroupArn' \
-                        --output text)
+                        if (!tgArn || tgArn == "None") {
+                            tgArn = sh(
+                                script: """
+                                    aws elbv2 create-target-group \
+                                        --name ${TARGET_GROUP_NAME} \
+                                        --protocol HTTP \
+                                        --port ${CONTAINER_PORT} \
+                                        --target-type ip \
+                                        --vpc-id ${VPC_ID} \
+                                        --health-check-path / \
+                                        --region ${AWS_REGION} \
+                                        --query 'TargetGroups[0].TargetGroupArn' \
+                                        --output text
+                                """,
+                                returnStdout: true
+                            ).trim()
+                            echo "✅ Created Target Group: ${tgArn}"
+                        } else {
+                            echo "✅ Target Group already exists: ${tgArn}"
+                        }
 
-                    echo "✅ Created Target Group: $TG_ARN"
-                    else
-                    echo "✅ Target Group already exists: $TG_ARN"
-                    fi
-
-                    echo "TG_ARN=$TG_ARN" > alb_target_info.env
-                '''
+                        env.TG_ARN = tgArn
+                    }
                 }
             }
         }
-  
+
 
 
         
@@ -228,7 +269,7 @@ pipeline {
                                 --task-definition ${TASK_DEFINITION_ARN} \
                                 --launch-type FARGATE \
                                 --network-configuration "awsvpcConfiguration={subnets=[${SUBNET_IDS}],securityGroups=[${SECURITY_GROUP_IDS}],assignPublicIp=ENABLED}" \
-                                --load-balancers "targetGroupArn=${TG_ARN},containerName=${CONTAINER_NAME},containerPort=5000" \
+                                --load-balancers "targetGroupArn=${TG_ARN},containerName=${CONTAINER_NAME},containerPort=${CONTAINER_PORT}" \
                                 --desired-count 1 \
                                 --region ${AWS_REGION}
                         else
