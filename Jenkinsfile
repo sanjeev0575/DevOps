@@ -157,7 +157,6 @@ pipeline {
             }
         }
 
-        
         stage('Check or Create ECS Service') {
             steps {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
@@ -165,8 +164,8 @@ pipeline {
                         sh '''#!/bin/bash
                         echo "🔍 Checking if ECS service exists..."
                         SERVICE_STATUS=$(aws ecs describe-services \
-                            --cluster ${ECS_CLUSTER_NAME} \
-                            --services ${ECS_SERVICE_NAME} \
+                            --cluster ${ECS_CLUSTER} \
+                            --services ${ECS_SERVICE} \
                             --region ${AWS_REGION} \
                             --query 'services[0].status' --output text 2>/dev/null || echo "MISSING")
 
@@ -175,8 +174,8 @@ pipeline {
                         if [ "$SERVICE_STATUS" = "MISSING" ] || [ "$SERVICE_STATUS" = "INACTIVE" ]; then
                             echo "🚀 Creating ECS service..."
                             aws ecs create-service \
-                                --cluster ${ECS_CLUSTER_NAME} \
-                                --service-name ${ECS_SERVICE_NAME} \
+                                --cluster ${ECS_CLUSTER} \
+                                --service-name ${ECS_SERVICE} \
                                 --task-definition ${TASK_DEFINITION_ARN} \
                                 --desired-count 1 \
                                 --launch-type FARGATE \
@@ -191,7 +190,6 @@ pipeline {
             }
         }
 
-        
         stage('Deploy to ECS') {
             steps {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
