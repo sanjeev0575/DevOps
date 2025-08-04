@@ -451,6 +451,14 @@ pipeline {
             steps {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                     sh '''
+                        export TASK_DEFINITION_NAME="automated-deploy-task-${BUILD_NUMBER}"
+                        export AWS_REGION="${AWS_REGION}"
+                        export AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID}"
+                        export CONTAINER_NAME="my-app-container"
+                        export ECR_REGISTRY="${ECR_REGISTRY}"
+                        export ECR_REPOSITORY="${ECR_REPOSITORY}"
+                        export IMAGE_TAG="${IMAGE_TAG}"
+                        
                         envsubst < task-definition-template.json > task-definition-rendered.json
                     '''
 
