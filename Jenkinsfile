@@ -126,11 +126,11 @@ pipeline {
             steps {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                     sh '''
-                            echo "📊 Checking target health..."
-                            aws elbv2 describe-target-health \
-                                --target-group-arn ${TG_ARN} \
-                                --region ${AWS_REGION} \
-                                --output table
+                        echo "📊 Checking target health..."
+                        aws elbv2 describe-target-health \
+                            --target-group-arn ${TG_ARN} \
+                            --region ${AWS_REGION} \
+                            --output table
                     '''
                 }
             }
