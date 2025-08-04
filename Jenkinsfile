@@ -669,23 +669,26 @@ pipeline {
 
         stage('Wait for ECS Service Stability') {
             steps {
-                script {
-                    def maxAttempts = 30
-                    def delay = 20
-                    for (int i = 0; i < maxAttempts; i++) {
-                        def status = sh(
-                            script: "aws ecs describe-services --cluster ${ECS_CLUSTER} --services ${ECS_SERVICE} --region ${AWS_REGION} --query 'services[0].deployments'",
-                            returnStdout: true
-                        ).trim()
+                withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
 
-                        if (status.contains('"rolloutState": "COMPLETED"') && status.contains('"status": "PRIMARY"')) {
-                            echo "✅ Service is stable"
-                            break
-                        } else {
-                            echo "⏳ Waiting ${delay}s... (${i + 1}/${maxAttempts})"
-                            sleep delay
+                    script {
+                        def maxAttempts = 30
+                        def delay = 20
+                        for (int i = 0; i < maxAttempts; i++) {
+                            def status = sh(
+                                script: "aws ecs describe-services --cluster ${ECS_CLUSTER} --services ${ECS_SERVICE} --region ${AWS_REGION} --query 'services[0].deployments'",
+                                returnStdout: true
+                            ).trim()
+
+                            if (status.contains('"rolloutState": "COMPLETED"') && status.contains('"status": "PRIMARY"')) {
+                                echo "✅ Service is stable"
+                                break
+                            } else {
+                                echo "⏳ Waiting ${delay}s... (${i + 1}/${maxAttempts})"
+                                sleep delay
+                            }
                         }
-                    }
+                    }    
                 }
             }
         }
