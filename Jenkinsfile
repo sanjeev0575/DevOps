@@ -199,7 +199,7 @@ pipeline {
                     echo "✅ Target Group already exists: $TG_ARN"
                     fi
 
-                    echo "TG_ARN=$TG_ARN" >> alb_target_info.env
+                    echo "TG_ARN=$TG_ARN" > alb_target_info.env
                 '''
                 }
             }
