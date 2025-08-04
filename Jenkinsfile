@@ -406,7 +406,7 @@ pipeline {
         TASK_DEFINITION_NAME = "automated-deploy-task-${BUILD_NUMBER}"
         CONTAINER_NAME       = 'my-app-container'
         SUBNET_IDS           = 'subnet-01d7c4a4a6f9235e6,subnet-01c1ca97fe8b13fb1'
-        SECURITY_GROUP_IDS   = 'sg-0c57473a6ece357b0'
+        SECURITY_GROUP_IDS   = 'sg-06038dcb5d09203b0'
         TARGET_GROUP_NAME    = "flask-tg-${BUILD_NUMBER}"
         LOAD_BALANCER_NAME   = "automated-flask-alb-${BUILD_NUMBER}"
         LISTENER_PORT        = '80'
@@ -667,31 +667,31 @@ pipeline {
             }
         }
 
-        stage('Wait for ECS Service Stability') {
-            steps {
-                withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+        // stage('Wait for ECS Service Stability') {
+        //     steps {
+        //         withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
 
-                    script {
-                        def maxAttempts = 30
-                        def delay = 20
-                        for (int i = 0; i < maxAttempts; i++) {
-                            def status = sh(
-                                script: "aws ecs describe-services --cluster ${ECS_CLUSTER} --services ${ECS_SERVICE} --region ${AWS_REGION} --query 'services[0].deployments'",
-                                returnStdout: true
-                            ).trim()
+        //             script {
+        //                 def maxAttempts = 30
+        //                 def delay = 20
+        //                 for (int i = 0; i < maxAttempts; i++) {
+        //                     def status = sh(
+        //                         script: "aws ecs describe-services --cluster ${ECS_CLUSTER} --services ${ECS_SERVICE} --region ${AWS_REGION} --query 'services[0].deployments'",
+        //                         returnStdout: true
+        //                     ).trim()
 
-                            if (status.contains('"rolloutState": "COMPLETED"') && status.contains('"status": "PRIMARY"')) {
-                                echo "✅ Service is stable"
-                                break
-                            } else {
-                                echo "⏳ Waiting ${delay}s... (${i + 1}/${maxAttempts})"
-                                sleep delay
-                            }
-                        }
-                    }    
-                }
-            }
-        }
+        //                     if (status.contains('"rolloutState": "COMPLETED"') && status.contains('"status": "PRIMARY"')) {
+        //                         echo "✅ Service is stable"
+        //                         break
+        //                     } else {
+        //                         echo "⏳ Waiting ${delay}s... (${i + 1}/${maxAttempts})"
+        //                         sleep delay
+        //                     }
+        //                 }
+        //             }    
+        //         }
+        //     }
+        // }
 
         stage('Final Target Group Health Check') {
             steps {
