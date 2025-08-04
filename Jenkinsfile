@@ -122,11 +122,11 @@ pipeline {
                 }
             }
         }
-        stage('Check Target Group Health') {
+        stage('Final Target Group Health Check') {
             steps {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                     sh '''
-                        echo "📊 Checking target health..."
+                        echo "📊 Final target health check..."
                         aws elbv2 describe-target-health \
                             --target-group-arn ${TG_ARN} \
                             --region ${AWS_REGION} \
@@ -135,6 +135,7 @@ pipeline {
                 }
             }
         }
+
         
         stage('Check or Create ECS Service') {
             steps {
