@@ -100,43 +100,40 @@ pipeline {
                 }
             }
         }
-
         stage('Check or Create ECS Service') {
-            steps {
-                withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                    script {
-                        def serviceExists = sh(
-                            script: """
-                                aws ecs describe-services \
-                                    --cluster ${ECS_CLUSTER} \
-                                    --services ${ECS_SERVICE} \
-                                    --region ${AWS_REGION} \
-                                    --query 'services[0].status' \
-                                    --output text || echo 'NONE'
-                            """,
-                            returnStdout: true
-                        ).trim()
+        steps {
+            withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                script {
+                    sh '''#!/bin/bash
+                    echo "🔍 Checking if ECS service exists..."
+                    SERVICE_STATUS=$(aws ecs describe-services \
+                        --cluster ${ECS_CLUSTER_NAME} \
+                        --services ${ECS_SERVICE_NAME} \
+                        --region ${AWS_REGION} \
+                        --query 'services[0].status' --output text 2>/dev/null || echo "MISSING")
 
-                        if (serviceExists == 'ACTIVE') {
-                            echo "ECS service already exists."
-                        } else {
-                            echo "Creating ECS service..."
-                            sh """
-                                aws ecs create-service \
-                                    --cluster ${ECS_CLUSTER} \
-                                    --service-name ${ECS_SERVICE} \
-                                    --task-definition ${TASK_DEFINITION_ARN} \
-                                    --launch-type FARGATE \
-                                    --network-configuration 'awsvpcConfiguration={subnets=[${SUBNET_IDS}],securityGroups=[${SECURITY_GROUP_IDS}],assignPublicIp=ENABLED}' \
-                                    --load-balancers '[{"targetGroupArn":"${TG_ARN}","containerName":"${CONTAINER_NAME}","containerPort":5000}]' \
-                                    --region ${AWS_REGION}
-                            """
-                        }
-                    }
+                    echo "🔎 Current service status: $SERVICE_STATUS"
+
+                    if [ "$SERVICE_STATUS" = "MISSING" ] || [ "$SERVICE_STATUS" = "INACTIVE" ]; then
+                        echo "🚀 Creating ECS service..."
+                        aws ecs create-service \
+                            --cluster ${ECS_CLUSTER_NAME} \
+                            --service-name ${ECS_SERVICE_NAME} \
+                            --task-definition ${TASK_DEFINITION_ARN} \
+                            --desired-count 1 \
+                            --launch-type FARGATE \
+                            --network-configuration "awsvpcConfiguration={subnets=[${SUBNET_IDS}],securityGroups=[${SECURITY_GROUP_IDS}],assignPublicIp=ENABLED}" \
+                            --region ${AWS_REGION}
+                    else
+                        echo "✅ ECS service already exists with status: $SERVICE_STATUS"
+                    fi
+                    '''
                 }
             }
         }
+    }
 
+        
         stage('Deploy to ECS') {
             steps {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
