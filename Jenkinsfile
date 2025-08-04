@@ -569,54 +569,113 @@ pipeline {
             }
         }
 
+        // stage('Attach Target Group to Listener') {
+        //     steps {
+        //         withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+        //             script {
+        //                 def listenerArn = sh(
+        //                     script: '''
+        //                         aws elbv2 describe-listeners \
+        //                             --load-balancer-arn $(aws elbv2 describe-load-balancers \
+        //                                 --names ${LOAD_BALANCER_NAME} \
+        //                                 --region ${AWS_REGION} \
+        //                                 --query 'LoadBalancers[0].LoadBalancerArn' \
+        //                                 --output text) \
+        //                             --query "Listeners[?Port==\${LISTENER_PORT}].ListenerArn" \
+        //                             --region ${AWS_REGION} \
+        //                             --output text
+        //                     ''',
+        //                     returnStdout: true
+        //                 ).trim()
+
+        //                 if (!listenerArn || listenerArn == "None" || listenerArn == "") {
+        //                     listenerArn = sh(
+        //                         script: '''
+        //                             aws elbv2 create-listener \
+        //                                 --load-balancer-arn $(aws elbv2 describe-load-balancers \
+        //                                     --names ${LOAD_BALANCER_NAME} \
+        //                                     --region ${AWS_REGION} \
+        //                                     --query 'LoadBalancers[0].LoadBalancerArn' \
+        //                                     --output text) \
+        //                                 --protocol HTTP \
+        //                                 --port ${LISTENER_PORT} \
+        //                                 --default-actions Type=forward,TargetGroupArn=${TG_ARN} \
+        //                                 --region ${AWS_REGION} \
+        //                                 --query 'Listeners[0].ListenerArn' \
+        //                                 --output text
+        //                         ''',
+        //                         returnStdout: true
+        //                     ).trim()
+        //                 } else {
+        //                     sh '''
+        //                         aws elbv2 modify-listener \
+        //                             --listener-arn ${listenerArn} \
+        //                             --default-actions Type=forward,TargetGroupArn=${TG_ARN} \
+        //                             --region ${AWS_REGION}
+        //                     '''
+        //                 }
+
+        //                 env.LISTENER_ARN = listenerArn
+        //                 echo "✅ Listener ARN: ${LISTENER_ARN}"
+        //             }
+        //         }
+        //     }
+        // }
         stage('Attach Target Group to Listener') {
             steps {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                     script {
-                        def listenerArn = sh(
-                            script: '''
-                                aws elbv2 describe-listeners \
-                                    --load-balancer-arn $(aws elbv2 describe-load-balancers \
-                                        --names ${LOAD_BALANCER_NAME} \
-                                        --region ${AWS_REGION} \
-                                        --query 'LoadBalancers[0].LoadBalancerArn' \
-                                        --output text) \
-                                    --query "Listeners[?Port==\${LISTENER_PORT}].ListenerArn" \
+                        // Get Load Balancer ARN first (safer and reusable)
+                        def loadBalancerArn = sh(
+                            script: """
+                                aws elbv2 describe-load-balancers \
+                                    --names ${LOAD_BALANCER_NAME} \
                                     --region ${AWS_REGION} \
+                                    --query 'LoadBalancers[0].LoadBalancerArn' \
                                     --output text
-                            ''',
+                            """,
                             returnStdout: true
                         ).trim()
 
+                        // Try to get Listener ARN
+                        def listenerArn = sh(
+                            script: """
+                                aws elbv2 describe-listeners \
+                                    --load-balancer-arn ${loadBalancerArn} \
+                                    --region ${AWS_REGION} \
+                                    --query "Listeners[?Port==\`${LISTENER_PORT}\`].ListenerArn" \
+                                    --output text
+                            """,
+                            returnStdout: true
+                        ).trim()
+
+                        // Create listener if not found
                         if (!listenerArn || listenerArn == "None" || listenerArn == "") {
                             listenerArn = sh(
-                                script: '''
+                                script: """
                                     aws elbv2 create-listener \
-                                        --load-balancer-arn $(aws elbv2 describe-load-balancers \
-                                            --names ${LOAD_BALANCER_NAME} \
-                                            --region ${AWS_REGION} \
-                                            --query 'LoadBalancers[0].LoadBalancerArn' \
-                                            --output text) \
+                                        --load-balancer-arn ${loadBalancerArn} \
                                         --protocol HTTP \
                                         --port ${LISTENER_PORT} \
                                         --default-actions Type=forward,TargetGroupArn=${TG_ARN} \
                                         --region ${AWS_REGION} \
                                         --query 'Listeners[0].ListenerArn' \
                                         --output text
-                                ''',
+                                """,
                                 returnStdout: true
                             ).trim()
                         } else {
-                            sh '''
+                            // Modify listener if exists
+                            sh """
                                 aws elbv2 modify-listener \
                                     --listener-arn ${listenerArn} \
                                     --default-actions Type=forward,TargetGroupArn=${TG_ARN} \
                                     --region ${AWS_REGION}
-                            '''
+                            """
                         }
 
                         env.LISTENER_ARN = listenerArn
-                        echo "✅ Listener ARN: ${LISTENER_ARN}"
+                        echo "✅ Listener ARN: ${env.LISTENER_ARN}"
                     }
                 }
             }
