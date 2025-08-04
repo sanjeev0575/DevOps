@@ -15,6 +15,7 @@ pipeline {
         SUBNET_IDS           = 'subnet-01d7c4a4a6f9235e6'
         SECURITY_GROUP_IDS   = 'sg-0c57473a6ece357b0'
         TARGET_GROUP_NAME    = "flask-tg-${BUILD_NUMBER}"
+        LOAD_BALANCER_NAME   = "automated-flask-alb-${BUILD_NUMBER}"
         LISTENER_PORT        = '80'
     }
 
@@ -98,43 +99,115 @@ pipeline {
             }
         }
 
-        stage('Check or Create Target Group') {
+        // stage('Check or Create Target Group') {
+        //     steps {
+        //         withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+        //             script {
+        //                 def tgArn = sh(
+        //                     script: """
+        //                         aws elbv2 describe-target-groups \
+        //                             --names ${TARGET_GROUP_NAME} \
+        //                             --region ${AWS_REGION} \
+        //                             --query 'TargetGroups[0].TargetGroupArn' \
+        //                             --output text 2>/dev/null || echo "MISSING"
+        //                     """,
+        //                     returnStdout: true
+        //                 ).trim()
+
+        //                 if (tgArn == "MISSING") {
+        //                     tgArn = sh(
+        //                         script: """
+        //                             aws elbv2 create-target-group \
+        //                                 --name ${TARGET_GROUP_NAME} \
+        //                                 --protocol HTTP \
+        //                                 --port 5000 \
+        //                                 --vpc-id ${VPC_ID} \
+        //                                 --target-type ip \
+        //                                 --region ${AWS_REGION} \
+        //                                 --query 'TargetGroups[0].TargetGroupArn' \
+        //                                 --output text
+        //                         """,
+        //                         returnStdout: true
+        //                     ).trim()
+        //                 }
+        //                 env.TG_ARN = tgArn
+        //                 echo "✅ Target Group ARN: ${TG_ARN}"
+        //             }
+        //         }
+        //     }
+        // }
+        stage('Check or Create Load Balancer') {
             steps {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                    script {
-                        def tgArn = sh(
-                            script: """
-                                aws elbv2 describe-target-groups \
-                                    --names ${TARGET_GROUP_NAME} \
-                                    --region ${AWS_REGION} \
-                                    --query 'TargetGroups[0].TargetGroupArn' \
-                                    --output text 2>/dev/null || echo "MISSING"
-                            """,
-                            returnStdout: true
-                        ).trim()
+                sh '''
+                    echo "🔍 Checking if Load Balancer exists..."
+                    LB_ARN=$(aws elbv2 describe-load-balancers \
+                    --names ${LOAD_BALANCER_NAME} \
+                    --region ${AWS_REGION} \
+                    --query 'LoadBalancers[0].LoadBalancerArn' \
+                    --output text 2>/dev/null || echo "")
 
-                        if (tgArn == "MISSING") {
-                            tgArn = sh(
-                                script: """
-                                    aws elbv2 create-target-group \
-                                        --name ${TARGET_GROUP_NAME} \
-                                        --protocol HTTP \
-                                        --port 5000 \
-                                        --vpc-id ${VPC_ID} \
-                                        --target-type ip \
-                                        --region ${AWS_REGION} \
-                                        --query 'TargetGroups[0].TargetGroupArn' \
-                                        --output text
-                                """,
-                                returnStdout: true
-                            ).trim()
-                        }
-                        env.TG_ARN = tgArn
-                        echo "✅ Target Group ARN: ${TG_ARN}"
-                    }
+                    if [ -z "$LB_ARN" ] || [[ "$LB_ARN" == "None" ]]; then
+                    echo "🔧 Creating Load Balancer..."
+                    LB_ARN=$(aws elbv2 create-load-balancer \
+                        --name ${LOAD_BALANCER_NAME} \
+                        --subnets $(echo ${SUBNET_IDS} | tr ',' ' ') \
+                        --security-groups ${SECURITY_GROUP_IDS} \
+                        --scheme internet-facing \
+                        --type application \
+                        --region ${AWS_REGION} \
+                        --query 'LoadBalancers[0].LoadBalancerArn' \
+                        --output text)
+
+                    echo "✅ Created ALB: $LB_ARN"
+                    else
+                    echo "✅ ALB already exists: $LB_ARN"
+                    fi
+
+                    echo "LB_ARN=$LB_ARN" > alb_target_info.env
+                '''
                 }
             }
         }
+
+        stage('Check or Create Target Group') {
+            steps {
+                withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                sh '''
+                    source alb_target_info.env
+
+                    echo "🔍 Checking if Target Group exists..."
+                    TG_ARN=$(aws elbv2 describe-target-groups \
+                    --names ${TARGET_GROUP_NAME} \
+                    --region ${AWS_REGION} \
+                    --query 'TargetGroups[0].TargetGroupArn' \
+                    --output text 2>/dev/null || echo "")
+
+                    if [ -z "$TG_ARN" ] || [[ "$TG_ARN" == "None" ]]; then
+                    echo "🔧 Creating Target Group..."
+                    TG_ARN=$(aws elbv2 create-target-group \
+                        --name ${TARGET_GROUP_NAME} \
+                        --protocol HTTP \
+                        --port ${CONTAINER_PORT} \
+                        --target-type ip \
+                        --vpc-id ${VPC_ID} \
+                        --health-check-path / \
+                        --region ${AWS_REGION} \
+                        --query 'TargetGroups[0].TargetGroupArn' \
+                        --output text)
+
+                    echo "✅ Created Target Group: $TG_ARN"
+                    else
+                    echo "✅ Target Group already exists: $TG_ARN"
+                    fi
+
+                    echo "TG_ARN=$TG_ARN" >> alb_target_info.env
+                '''
+                }
+            }
+        }
+  
+
 
         
         stage('Check or Create ECS Service') {
