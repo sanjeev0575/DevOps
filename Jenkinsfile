@@ -14,7 +14,6 @@ pipeline {
         CONTAINER_NAME       = 'my-app-container'
         SUBNET_IDS           = 'subnet-01d7c4a4a6f9235e6,subnet-01c1ca97fe8b13fb1'
         SECURITY_GROUP_IDS   = 'sg-0c57473a6ece357b0'
-        LOAD_BALANCER_NAME   = "automated-flask-alb-${BUILD_NUMBER}"
         TARGET_GROUP_NAME    = "flask-tg-${BUILD_NUMBER}"
         LISTENER_PORT        = '80'
     }
@@ -56,13 +55,12 @@ pipeline {
         stage('Register Task Definition') {
             steps {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                    script {
-                        sh '''
-                            envsubst < task-definition-template.json > task-definition-rendered.json
-                            jq . task-definition-rendered.json
-                        '''
+                    sh '''
+                        envsubst < task-definition-template.json > task-definition-rendered.json
+                    '''
 
-                        def taskDefinitionOutput = sh(
+                    script {
+                        def taskDefArn = sh(
                             script: '''
                                 aws ecs register-task-definition \
                                     --cli-input-json file://task-definition-rendered.json \
@@ -73,8 +71,8 @@ pipeline {
                             returnStdout: true
                         ).trim()
 
-                        env.TASK_DEFINITION_ARN = taskDefinitionOutput
-                        echo "Registered Task Definition ARN: ${TASK_DEFINITION_ARN}"
+                        env.TASK_DEFINITION_ARN = taskDefArn
+                        echo "✅ Task Definition: ${TASK_DEFINITION_ARN}"
                     }
                 }
             }
@@ -84,18 +82,17 @@ pipeline {
             steps {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                     script {
-                        def firstSubnet = env.SUBNET_IDS.split(',')[0]
-                        env.VPC_ID = sh(
+                        def vpcId = sh(
                             script: """
                                 aws ec2 describe-subnets \
-                                    --subnet-ids ${firstSubnet} \
+                                    --subnet-ids ${SUBNET_IDS.split(',')[0]} \
                                     --region ${AWS_REGION} \
                                     --query 'Subnets[0].VpcId' \
                                     --output text
                             """,
                             returnStdout: true
                         ).trim()
-                        echo "✅ Resolved VPC ID from subnet: ${env.VPC_ID}"
+                        env.VPC_ID = vpcId
                     }
                 }
             }
@@ -105,7 +102,7 @@ pipeline {
             steps {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                     script {
-                        def tgExists = sh(
+                        def tgArn = sh(
                             script: """
                                 aws elbv2 describe-target-groups \
                                     --names ${TARGET_GROUP_NAME} \
@@ -116,9 +113,8 @@ pipeline {
                             returnStdout: true
                         ).trim()
 
-                        if (tgExists == "MISSING") {
-                            echo "📌 Target group not found. Creating target group: ${TARGET_GROUP_NAME}"
-                            def createdTgArn = sh(
+                        if (tgArn == "MISSING") {
+                            tgArn = sh(
                                 script: """
                                     aws elbv2 create-target-group \
                                         --name ${TARGET_GROUP_NAME} \
@@ -132,47 +128,27 @@ pipeline {
                                 """,
                                 returnStdout: true
                             ).trim()
-                            env.TG_ARN = createdTgArn
-                            echo "✅ Created Target Group ARN: ${TG_ARN}"
-                        } else {
-                            env.TG_ARN = tgExists
-                            echo "✅ Target Group already exists: ${TG_ARN}"
                         }
+                        env.TG_ARN = tgArn
+                        echo "✅ Target Group ARN: ${TG_ARN}"
                     }
                 }
             }
         }
 
-        stage('Final Target Group Health Check') {
-            steps {
-                withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                    sh '''
-                        echo "📊 Final target health check..."
-                        aws elbv2 describe-target-health \
-                            --target-group-arn ${TG_ARN} \
-                            --region ${AWS_REGION} \
-                            --output table
-                    '''
-                }
-            }
-        }
-
+        
         stage('Check or Create ECS Service') {
             steps {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                     script {
                         sh '''#!/bin/bash
-                        echo "🔍 Checking if ECS service exists..."
-                        SERVICE_STATUS=$(aws ecs describe-services \
+                        STATUS=$(aws ecs describe-services \
                             --cluster ${ECS_CLUSTER} \
                             --services ${ECS_SERVICE} \
                             --region ${AWS_REGION} \
                             --query 'services[0].status' --output text 2>/dev/null || echo "MISSING")
 
-                        echo "🔎 Current service status: $SERVICE_STATUS"
-
-                        if [ "$SERVICE_STATUS" = "MISSING" ] || [ "$SERVICE_STATUS" = "INACTIVE" ]; then
-                            echo "🚀 Creating ECS service..."
+                        if [ "$STATUS" = "MISSING" ] || [ "$STATUS" = "INACTIVE" ]; then
                             aws ecs create-service \
                                 --cluster ${ECS_CLUSTER} \
                                 --service-name ${ECS_SERVICE} \
@@ -180,9 +156,8 @@ pipeline {
                                 --desired-count 1 \
                                 --launch-type FARGATE \
                                 --network-configuration "awsvpcConfiguration={subnets=[${SUBNET_IDS}],securityGroups=[${SECURITY_GROUP_IDS}],assignPublicIp=ENABLED}" \
+                                --load-balancers "targetGroupArn=${TG_ARN},containerName=${CONTAINER_NAME},containerPort=5000" \
                                 --region ${AWS_REGION}
-                        else
-                            echo "✅ ECS service already exists with status: $SERVICE_STATUS"
                         fi
                         '''
                     }
@@ -205,46 +180,43 @@ pipeline {
             }
         }
 
+
+
         stage('Wait for ECS Service Stability') {
             steps {
-                withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                    script {
-                        def maxAttempts = 30
-                        def delay = 30
-                        for (int i = 0; i < maxAttempts; i++) {
-                            def output = sh(
-                                script: "aws ecs describe-services --cluster ${ECS_CLUSTER} --services ${ECS_SERVICE} --region ${AWS_REGION} --query 'services[0].deployments'",
-                                returnStdout: true
-                            ).trim()
+                script {
+                    def maxAttempts = 30
+                    def delay = 20
+                    for (int i = 0; i < maxAttempts; i++) {
+                        def status = sh(
+                            script: "aws ecs describe-services --cluster ${ECS_CLUSTER} --services ${ECS_SERVICE} --region ${AWS_REGION} --query 'services[0].deployments'",
+                            returnStdout: true
+                        ).trim()
 
-                            if (output.contains('"rolloutState": "COMPLETED"') && output.contains('"status": "PRIMARY"')) {
-                                echo "✅ ECS service is stable."
-                                break
-                            } else {
-                                echo "⏳ Service not stable yet. Attempt ${i + 1}/${maxAttempts}. Waiting ${delay}s..."
-                                sleep delay
-                            }
-
-                            if (i == maxAttempts - 1) {
-                                error("❌ ECS service did not stabilize within ${maxAttempts * delay / 60} minutes.")
-                            }
+                        if (status.contains('"rolloutState": "COMPLETED"') && status.contains('"status": "PRIMARY"')) {
+                            echo "✅ Service is stable"
+                            break
+                        } else {
+                            echo "⏳ Waiting ${delay}s... (${i+1}/${maxAttempts})"
+                            sleep delay
                         }
                     }
                 }
             }
         }
 
-        stage('Check Target Group Health') {
+        
+
+
+        stage('Final Target Group Health Check') {
             steps {
-                withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                    sh '''
-                        echo "📊 Checking target health..."
-                        aws elbv2 describe-target-health \
-                            --target-group-arn ${TG_ARN} \
-                            --region ${AWS_REGION} \
-                            --output table
-                    '''
-                }
+                sh '''
+                    echo "📊 Checking final target health..."
+                    aws elbv2 describe-target-health \
+                        --target-group-arn ${TG_ARN} \
+                        --region ${AWS_REGION} \
+                        --output table
+                '''
             }
         }
     }
@@ -254,10 +226,10 @@ pipeline {
             sh 'docker system prune -f'
         }
         success {
-            echo '✅ Deployment pipeline completed successfully!'
+            echo '✅ Deployment complete.'
         }
         failure {
-            echo '❌ Deployment failed. Check ECS events and CloudWatch logs.'
+            echo '❌ Deployment failed. Check ECS and CloudWatch logs.'
         }
     }
 }
