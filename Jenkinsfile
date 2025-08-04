@@ -101,27 +101,48 @@ pipeline {
             }
         }
 
-        stage('Fetch Target Group ARN') {
+        stage('Check or Create Target Group') {
             steps {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                     script {
-                        def tgArn = sh(
+                        def tgExists = sh(
                             script: """
                                 aws elbv2 describe-target-groups \
-                                        --names ${TARGET_GROUP_NAME} \
+                                    --names ${TARGET_GROUP_NAME} \
+                                    --region ${AWS_REGION} \
+                                    --query 'TargetGroups[0].TargetGroupArn' \
+                                    --output text 2>/dev/null || echo "MISSING"
+                            """,
+                            returnStdout: true
+                        ).trim()
+
+                        if (tgExists == "MISSING") {
+                            echo "📌 Target group not found. Creating target group: ${TARGET_GROUP_NAME}"
+                            def createdTgArn = sh(
+                                script: """
+                                    aws elbv2 create-target-group \
+                                        --name ${TARGET_GROUP_NAME} \
+                                        --protocol HTTP \
+                                        --port 5000 \
+                                        --vpc-id ${VPC_ID} \
+                                        --target-type ip \
                                         --region ${AWS_REGION} \
                                         --query 'TargetGroups[0].TargetGroupArn' \
                                         --output text
                                 """,
-                            returnStdout: true
-                        ).trim()
-
-                        env.TG_ARN = tgArn
-                        echo "✅ Target Group ARN fetched: ${TG_ARN}"
+                                returnStdout: true
+                            ).trim()
+                            env.TG_ARN = createdTgArn
+                            echo "✅ Created Target Group ARN: ${TG_ARN}"
+                        } else {
+                            env.TG_ARN = tgExists
+                            echo "✅ Target Group already exists: ${TG_ARN}"
+                        }
                     }
                 }
             }
         }
+
         stage('Final Target Group Health Check') {
             steps {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
