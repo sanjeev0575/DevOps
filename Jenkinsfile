@@ -760,8 +760,7 @@ pipeline {
                         aws elbv2 describe-target-health \
                             --target-group-arn ${TG_ARN} \
                             --region ${AWS_REGION} \
-                            --output table
-                    '''
+                        '''
                 }
             }
         }
