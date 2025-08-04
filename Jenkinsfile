@@ -643,7 +643,7 @@ pipeline {
                                 aws elbv2 describe-listeners \
                                     --load-balancer-arn ${loadBalancerArn} \
                                     --region ${AWS_REGION} \
-                                    --query "Listeners[?Port==\`${LISTENER_PORT}\`].ListenerArn" \
+                                    --query "Listeners[?Port==${LISTENER_PORT}].ListenerArn" \
                                     --output text
                             """,
                             returnStdout: true
