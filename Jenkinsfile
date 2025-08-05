@@ -777,8 +777,17 @@ pipeline {
             steps {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                     sh '''
-                        TASK_ARN=$(aws ecs list-tasks --cluster ${ECS_CLUSTER} --service-name ${ECS_SERVICE} --region ${AWS_REGION} --query 'taskArns[0]' --output text)
+                        echo "Fetching ECS Task ARN..."
+                        TASK_ARN=$(aws ecs list-tasks \
+                            --cluster ${ECS_CLUSTER} \
+                            --service-name ${ECS_SERVICE} \
+                            --region ${AWS_REGION} \
+                            --query 'taskArns[0]' \
+                            --output text)
 
+                        echo "Task ARN: $TASK_ARN"
+
+                        echo "Fetching private IP of the ECS Task..."
                         PRIVATE_IP=$(aws ecs describe-tasks \
                             --cluster ${ECS_CLUSTER} \
                             --tasks $TASK_ARN \
@@ -787,6 +796,15 @@ pipeline {
                             --output text)
 
                         echo "ECS Task IP: $PRIVATE_IP"
+
+                        echo "Registering target to Target Group..."
+                        aws elbv2 register-targets \
+                            --target-group-arn ${TG_ARN} \
+                            --targets Id=${PRIVATE_IP},Port=80 \
+                            --region ${AWS_REGION}
+
+                        echo "Waiting for target to register..."
+                        sleep 20
 
                         echo "Target group health:"
                         aws elbv2 describe-target-health \
