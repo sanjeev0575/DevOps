@@ -20,7 +20,7 @@
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
-          "awslogs-group": "/ecs/${TASK_DEFINITION_NAME}",
+          "awslogs-group": "/ecs/${TASK_DEFINITION_NAME}-${BUILD_NUMBER}",
           "awslogs-region": "${AWS_REGION}",
           "awslogs-stream-prefix": "ecs"
         }

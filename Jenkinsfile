@@ -53,6 +53,31 @@ pipeline {
                 }
             }
         }
+        stage('Create CloudWatch Log Group') {
+            steps {
+                withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                    sh '''
+                        LOG_GROUP_NAME="/ecs/${TASK_DEFINITION_NAME}-${BUILD_NUMBER}"
+                        echo "🔍 Checking CloudWatch Log Group: $LOG_GROUP_NAME"
+
+                        if ! aws logs describe-log-groups \
+                            --log-group-name-prefix "$LOG_GROUP_NAME" \
+                            --region ${AWS_REGION} \
+                            --query 'logGroups[?logGroupName==`'$LOG_GROUP_NAME'`]' \
+                            --output text | grep -q "$LOG_GROUP_NAME"; then
+                            
+                            echo "🆕 Creating CloudWatch Log Group..."
+                            aws logs create-log-group \
+                                --log-group-name "$LOG_GROUP_NAME" \
+                                --region ${AWS_REGION}
+                        else
+                            echo "✅ Log Group already exists: $LOG_GROUP_NAME"
+                        fi
+                    '''
+                }
+            }
+        }
+
 
         stage('Register Task Definition') {
             steps {
