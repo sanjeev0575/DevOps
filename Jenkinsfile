@@ -354,10 +354,21 @@ pipeline {
                             --service ${ECS_SERVICE} \
                             --desired-count 1 \
                             --region ${AWS_REGION}
+                    fi
 
-                        echo "Waiting for task to start..."
-                        sleep 20
+                    # Wait until we have a running task
+                    echo "Waiting for ECS task to start..."
+                    MAX_WAIT=60  # seconds
+                    WAIT_INTERVAL=5
+                    ELAPSED=0
 
+                    while [ "$TASK_ARN" = "None" ] || [ -z "$TASK_ARN" ]; do
+                        if [ $ELAPSED -ge $MAX_WAIT ]; then
+                            echo "Error: No running task found after waiting $MAX_WAIT seconds."
+                            exit 1
+                        fi
+                        sleep $WAIT_INTERVAL
+                        ELAPSED=$((ELAPSED + WAIT_INTERVAL))
                         TASK_ARN=$(aws ecs list-tasks \
                             --cluster ${ECS_CLUSTER} \
                             --service-name ${ECS_SERVICE} \
@@ -365,25 +376,35 @@ pipeline {
                             --desired-status RUNNING \
                             --query 'taskArns[0]' \
                             --output text)
-                    fi
+                    done
 
                     echo "Task ARN: $TASK_ARN"
 
-                    if [ "$TASK_ARN" = "None" ] || [ -z "$TASK_ARN" ]; then
-                        echo "Error: No running task found even after starting. Exiting..."
-                        exit 1
-                    fi
-
+                    # Fetch private IP with retries
                     echo "Fetching private IP of the ECS Task..."
-                    PRIVATE_IP=$(aws ecs describe-tasks \
-                        --cluster ${ECS_CLUSTER} \
-                        --tasks $TASK_ARN \
-                        --region ${AWS_REGION} \
-                        --query 'tasks[0].attachments[0].details[?name==`privateIPv4Address`].value' \
-                        --output text)
+                    PRIVATE_IP=""
+                    ELAPSED=0
+                    while [ -z "$PRIVATE_IP" ] || [ "$PRIVATE_IP" = "None" ]; do
+                        if [ $ELAPSED -ge $MAX_WAIT ]; then
+                            echo "Error: Could not fetch private IP after $MAX_WAIT seconds."
+                            exit 1
+                        fi
+                        PRIVATE_IP=$(aws ecs describe-tasks \
+                            --cluster ${ECS_CLUSTER} \
+                            --tasks $TASK_ARN \
+                            --region ${AWS_REGION} \
+                            --query 'tasks[0].attachments[0].details[?name==`privateIPv4Address`].value' \
+                            --output text)
+                        if [ -z "$PRIVATE_IP" ] || [ "$PRIVATE_IP" = "None" ]; then
+                            echo "Private IP not available yet. Waiting..."
+                            sleep $WAIT_INTERVAL
+                            ELAPSED=$((ELAPSED + WAIT_INTERVAL))
+                        fi
+                    done
 
                     echo "ECS Task IP: $PRIVATE_IP"
 
+                    # Register target to ALB
                     echo "Registering target to Target Group..."
                     aws elbv2 register-targets \
                         --target-group-arn ${TG_ARN} \
@@ -397,6 +418,7 @@ pipeline {
                     aws elbv2 describe-target-health \
                         --target-group-arn ${TG_ARN} \
                         --region ${AWS_REGION}
+
                 '''
             }
         }
