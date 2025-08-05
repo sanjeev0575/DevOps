@@ -409,7 +409,8 @@ pipeline {
         SECURITY_GROUP_IDS   = 'sg-0acc29bad05199bf5'
         TARGET_GROUP_NAME    = "flask-tg-${BUILD_NUMBER}"
         LOAD_BALANCER_NAME   = "automated-flask-alb-${BUILD_NUMBER}"
-        LISTENER_PORT        = '443'
+        TASK_DEFINITION_NAME = "automated-deploy-task-${BUILD_NUMBER}"
+        LISTENER_PORT        = '80'
         CONTAINER_PORT       = '5000'
     }
 
@@ -760,15 +761,38 @@ pipeline {
         //     }
         // }
 
-        stage('Final Target Group Health Check') {
+        // stage('Final Target Group Health Check') {
+        //     steps {
+        //         withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+        //             sh '''
+        //                 echo "📊 Checking final target health..."
+        //                 aws elbv2 describe-target-health \
+        //                     --target-group-arn ${TG_ARN} \
+        //                     --region ${AWS_REGION} \
+        //                 '''
+        //         }
+        //     }
+        // }
+        stage('Debug Target Registration') {
             steps {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                     sh '''
-                        echo "📊 Checking final target health..."
+                        TASK_ARN=$(aws ecs list-tasks --cluster ${ECS_CLUSTER} --service-name ${ECS_SERVICE} --region ${AWS_REGION} --query 'taskArns[0]' --output text)
+
+                        PRIVATE_IP=$(aws ecs describe-tasks \
+                            --cluster ${ECS_CLUSTER} \
+                            --tasks $TASK_ARN \
+                            --region ${AWS_REGION} \
+                            --query 'tasks[0].attachments[0].details[?name==`privateIPv4Address`].value' \
+                            --output text)
+
+                        echo "ECS Task IP: $PRIVATE_IP"
+
+                        echo "Target group health:"
                         aws elbv2 describe-target-health \
                             --target-group-arn ${TG_ARN} \
-                            --region ${AWS_REGION} \
-                        '''
+                            --region ${AWS_REGION}
+                    '''
                 }
             }
         }
