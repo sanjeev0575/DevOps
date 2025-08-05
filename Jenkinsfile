@@ -291,47 +291,117 @@ pipeline {
 
 
         
-        stage('Debug Target Registration') {
-            steps {
-                withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                    sh '''
-                        echo "Fetching ECS Task ARN..."
+    //     stage('Debug Target Registration') {
+    //         steps {
+    //             withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+    //                 sh '''
+    //                     echo "Fetching ECS Task ARN..."
+    //                     TASK_ARN=$(aws ecs list-tasks \
+    //                         --cluster ${ECS_CLUSTER} \
+    //                         --service-name ${ECS_SERVICE} \
+    //                         --region ${AWS_REGION} \
+    //                         --query 'taskArns[0]' \
+    //                         --output text)
+
+
+    //                     echo "Task ARN: $TASK_ARN"
+
+    //                     echo "Fetching private IP of the ECS Task..."
+    //                     PRIVATE_IP=$(aws ecs describe-tasks \
+    //                         --cluster ${ECS_CLUSTER} \
+    //                         --tasks $TASK_ARN \
+    //                         --region ${AWS_REGION} \
+    //                         --query 'tasks[0].attachments[0].details[?name==`privateIPv4Address`].value' \
+    //                         --output text)
+
+    //                     echo "ECS Task IP: $PRIVATE_IP"
+
+    //                     echo "Registering target to Target Group..."
+    //                     aws elbv2 register-targets \
+    //                         --target-group-arn ${TG_ARN} \
+    //                         --targets Id=${PRIVATE_IP},Port=80 \
+    //                         --region ${AWS_REGION}
+
+    //                     echo "Waiting for target to register..."
+    //                     sleep 20
+
+    //                     echo "Target group health:"
+    //                     aws elbv2 describe-target-health \
+    //                         --target-group-arn ${TG_ARN} \
+    //                         --region ${AWS_REGION}
+    //                 '''
+    //             }
+    //         }
+    //     }
+    // }
+    stage('Debug Target Registration') {
+        steps {
+            withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                sh '''
+                    echo "Checking for running ECS tasks..."
+                    TASK_ARN=$(aws ecs list-tasks \
+                        --cluster ${ECS_CLUSTER} \
+                        --service-name ${ECS_SERVICE} \
+                        --region ${AWS_REGION} \
+                        --desired-status RUNNING \
+                        --query 'taskArns[0]' \
+                        --output text)
+
+                    if [ "$TASK_ARN" = "None" ] || [ -z "$TASK_ARN" ]; then
+                        echo "No running tasks found. Updating service desired count to 1..."
+                        aws ecs update-service \
+                            --cluster ${ECS_CLUSTER} \
+                            --service ${ECS_SERVICE} \
+                            --desired-count 1 \
+                            --region ${AWS_REGION}
+
+                        echo "Waiting for task to start..."
+                        sleep 20
+
                         TASK_ARN=$(aws ecs list-tasks \
                             --cluster ${ECS_CLUSTER} \
                             --service-name ${ECS_SERVICE} \
                             --region ${AWS_REGION} \
+                            --desired-status RUNNING \
                             --query 'taskArns[0]' \
                             --output text)
+                    fi
 
-                        echo "Task ARN: $TASK_ARN"
+                    echo "Task ARN: $TASK_ARN"
 
-                        echo "Fetching private IP of the ECS Task..."
-                        PRIVATE_IP=$(aws ecs describe-tasks \
-                            --cluster ${ECS_CLUSTER} \
-                            --tasks $TASK_ARN \
-                            --region ${AWS_REGION} \
-                            --query 'tasks[0].attachments[0].details[?name==`privateIPv4Address`].value' \
-                            --output text)
+                    if [ "$TASK_ARN" = "None" ] || [ -z "$TASK_ARN" ]; then
+                        echo "Error: No running task found even after starting. Exiting..."
+                        exit 1
+                    fi
 
-                        echo "ECS Task IP: $PRIVATE_IP"
+                    echo "Fetching private IP of the ECS Task..."
+                    PRIVATE_IP=$(aws ecs describe-tasks \
+                        --cluster ${ECS_CLUSTER} \
+                        --tasks $TASK_ARN \
+                        --region ${AWS_REGION} \
+                        --query 'tasks[0].attachments[0].details[?name==`privateIPv4Address`].value' \
+                        --output text)
 
-                        echo "Registering target to Target Group..."
-                        aws elbv2 register-targets \
-                            --target-group-arn ${TG_ARN} \
-                            --targets Id=${PRIVATE_IP},Port=80 \
-                            --region ${AWS_REGION}
+                    echo "ECS Task IP: $PRIVATE_IP"
 
-                        echo "Waiting for target to register..."
-                        sleep 20
+                    echo "Registering target to Target Group..."
+                    aws elbv2 register-targets \
+                        --target-group-arn ${TG_ARN} \
+                        --targets Id=${PRIVATE_IP},Port=5000 \
+                        --region ${AWS_REGION}
 
-                        echo "Target group health:"
-                        aws elbv2 describe-target-health \
-                            --target-group-arn ${TG_ARN} \
-                            --region ${AWS_REGION}
-                    '''
-                }
+                    echo "Waiting for target to register..."
+                    sleep 20
+
+                    echo "Target group health:"
+                    aws elbv2 describe-target-health \
+                        --target-group-arn ${TG_ARN} \
+                        --region ${AWS_REGION}
+                '''
             }
         }
+    }
+    
     }
 
     post {
