@@ -142,6 +142,47 @@ pipeline {
             }
         }
 
+        // stage('Check or Create Target Group') {
+        //     steps {
+        //         withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+        //             script {
+        //                 def tgArn = sh(
+        //                     script: """
+        //                         aws elbv2 describe-target-groups \
+        //                             --names ${TARGET_GROUP_NAME} \
+        //                             --region ${AWS_REGION} \
+        //                             --query 'TargetGroups[0].TargetGroupArn' \
+        //                             --output text 2>/dev/null || echo ""
+        //                     """,
+        //                     returnStdout: true
+        //                 ).trim()
+
+        //                 if (!tgArn || tgArn == "None") {
+        //                     tgArn = sh(
+        //                         script: """
+        //                             aws elbv2 create-target-group \
+        //                                 --name ${TARGET_GROUP_NAME} \
+        //                                 --protocol HTTP \
+        //                                 --port ${CONTAINER_PORT} \
+        //                                 --target-type ip \
+        //                                 --vpc-id ${VPC_ID} \
+        //                                 --health-check-path / \
+        //                                 --region ${AWS_REGION} \
+        //                                 --query 'TargetGroups[0].TargetGroupArn' \
+        //                                 --output text
+        //                         """,
+        //                         returnStdout: true
+        //                     ).trim()
+        //                     echo "✅ Created Target Group: ${tgArn}"
+        //                 } else {
+        //                     echo "✅ Target Group already exists: ${tgArn}"
+        //                 }
+
+        //                 env.TG_ARN = tgArn
+        //             }
+        //         }
+        //     }
+        // }
         stage('Check or Create Target Group') {
             steps {
                 withCredentials([aws(credentialsId: 'aws-cred', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
@@ -166,7 +207,9 @@ pipeline {
                                         --port ${CONTAINER_PORT} \
                                         --target-type ip \
                                         --vpc-id ${VPC_ID} \
-                                        --health-check-path / \
+                                        --health-check-path /health \
+                                        --health-check-protocol HTTP \
+                                        --matcher HttpCode=200 \
                                         --region ${AWS_REGION} \
                                         --query 'TargetGroups[0].TargetGroupArn' \
                                         --output text
@@ -183,6 +226,7 @@ pipeline {
                 }
             }
         }
+
 
         stage('Attach Target Group to Listener') {
             steps {
