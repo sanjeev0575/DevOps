@@ -1082,7 +1082,7 @@ pipeline {
                                 --service-name ${ECS_SERVICE} \
                                 --task-definition ${TASK_DEFINITION_ARN} \
                                 --launch-type FARGATE \
-                                --network-configuration "awsvpcConfiguration={subnets=[\\\"${SUBNET_IDS//,/\\\",\\\"}\\\"],securityGroups=[\\\"${SECURITY_GROUP_IDS}\\\"],assignPublicIp=ENABLED}" \
+                                --network-configuration "awsvpcConfiguration={subnets=[${SUBNET_IDS}],securityGroups=[${SECURITY_GROUP_IDS}],assignPublicIp=ENABLED}" \
                                 --load-balancers "targetGroupArn=${TG_ARN},containerName=${CONTAINER_NAME},containerPort=${CONTAINER_PORT}" \
                                 --desired-count 1 \
                                 --region ${AWS_REGION}
